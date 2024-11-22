@@ -113,7 +113,7 @@ def bellman_grid_search(b_next, k_next, b, k, iz, alpha, delta, psi, xi, r, cf, 
     return V
 
 @njit
-def grid_search(b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W,Nb_choice = 50, Nk_choice = 50):
+def grid_search(b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W,Nb_choice = 150, Nk_choice = 150):
 
     Vmax = -np.inf 
     b_min = b * (1+r) - z_grid[iz] * k**alpha 
@@ -204,6 +204,34 @@ def vfi_step(V, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
                     
     return V_new, k_policy, b_policy
 
+@njit
+def howard_step(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
+
+    V_new = np.empty_like(W)
+    for iz in range(N_z):
+        for ik in range(N_k):
+            for ib in range(N_b):
+                if i_div_neg[iz,ib, ik]:
+                    V_new[iz, ib, ik] = 0
+                else:
+                    b = b_grid[ib]
+                    k = k_grid[ik]
+                    b_next = b_policy[iz, ib, ik]
+                    k_next = k_policy[iz, ib, ik]
+                    V_new[iz, ib, ik] = bellman_grid_search(b_next, k_next, b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W)
+
+    return V_new
+
+def howard(V, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
+
+    W = beta * fast_expectation(P, V)
+
+    for n in range(30):
+        V = howard_step(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
+        W = beta * fast_expectation(P, V)
+
+    return V
+
 def vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, tol = 1e-5):
     error = 1
 
@@ -213,12 +241,19 @@ def vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, tol = 1e-5
         error = np.sum(np.abs(Vnew - V))
         print(error)
         V = Vnew
+        V = howard(V, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
     return V, k_policy, b_policy 
 
 V_init = np.zeros((N_z, N_b, N_k))
 V, k_policy, b_policy = vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
 
-plt.plot(k_grid, k_policy[0,0,:])
+plt.plot(k_grid, k_policy[0,0,:], label = 'k_policy')
+plt.plot(k_grid, b_policy[0,0,:], label = 'b_policy')
+plt.legend()
+plt.xlabel('k')
+plt.title('Policy function for iz = 0, ib  0')
+plt.show()
+
 coh = z_grid[:,np.newaxis,np.newaxis] * k_grid[np.newaxis,np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,np.newaxis,:] - b_grid[np.newaxis,:,np.newaxis] * (1+r) 
 adj_cost = psi / 2 * (k_policy - (1-delta)*k_grid[np.newaxis,np.newaxis,:])**2 / k_grid[np.newaxis,np.newaxis,:] + xi * k_grid[np.newaxis,np.newaxis,:]
 div_opt = (1-i_div_neg) * (coh - adj_cost - k_policy + b_policy - cf )
