@@ -13,6 +13,7 @@ from scipy import optimize
 from mpl_toolkits.mplot3d import Axes3D
 import quantecon as qe 
 from scipy.optimize import golden 
+import matplotlib.pyplot as plt
 
 # Parameters
 
@@ -23,7 +24,7 @@ delta = 0.1
 rho = 0.8
 sigma_z = 0.2
 psi = 0.05
-xi = 0 #0.01
+xi = 0.01
 cf = 0 
 
 nu = 0.9
@@ -247,12 +248,20 @@ def vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, tol = 1e-5
 V_init = np.zeros((N_z, N_b, N_k))
 V, k_policy, b_policy = vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
 
-plt.plot(k_grid, k_policy[0,0,:], label = 'k_policy')
-plt.plot(k_grid, b_policy[0,0,:], label = 'b_policy')
-plt.legend()
-plt.xlabel('k')
-plt.title('Policy function for iz = 0, ib  0')
+fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+axes[0].plot(k_grid, k_policy[0, 0, :] - (1 - delta) * k_grid, label='Net investment with low TFP')
+axes[0].plot(k_grid, k_policy[-1, 0, :] - (1 - delta) * k_grid, label='Net investment with high TFP')
+axes[0].legend()
+axes[0].set_xlabel('k')
+axes[0].set_title('Net investment in the absence of debt')
+axes[1].plot(k_grid, k_policy[0, -1, :] - (1 - delta) * k_grid, label='Net investment with low TFP')
+axes[1].plot(k_grid, k_policy[-1, -1, :] - (1 - delta) * k_grid, label='Net investment with high TFP')
+axes[1].legend()
+axes[1].set_xlabel('k')
+axes[1].set_title('Net investment when high debt')
+plt.tight_layout()
 plt.show()
+
 
 coh = z_grid[:,np.newaxis,np.newaxis] * k_grid[np.newaxis,np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,np.newaxis,:] - b_grid[np.newaxis,:,np.newaxis] * (1+r) 
 adj_cost = psi / 2 * (k_policy - (1-delta)*k_grid[np.newaxis,np.newaxis,:])**2 / k_grid[np.newaxis,np.newaxis,:] + xi * k_grid[np.newaxis,np.newaxis,:]
