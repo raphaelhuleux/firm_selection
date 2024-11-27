@@ -10,7 +10,7 @@ import quantecon as qe
 TODO      
 - Do and plot simulations over time
     - Who exits?
-- Put in GE (exit / entry)
+- Stationary distribution in partial equilibrium (add intrants)
 - Simulate a monetary policy shock (a change in r)
 - Add labor? 
 """
