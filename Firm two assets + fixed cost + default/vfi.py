@@ -5,75 +5,7 @@ import quantecon as qe
 from consav.linear_interp_2d import interp_2d
 from numba import njit, prange
 import quantecon as qe 
-
-""" 
-TODO      
-- Do and plot simulations over time
-    - Who exits?
-- Stationary distribution in partial equilibrium (add intrants)
-- Simulate a monetary policy shock (a change in r)
-- Add labor? 
-"""
-
-# Parameters
-
-alpha = 1/2 # capital share
-beta = 0.95 # discount factor
-delta = 0.1
-
-rho = 0.8
-sigma_z = 0.2
-psi = 0.05
-xi = 0.01
-cf = 0.1
-
-nu = 0.9
-r = (1/beta - 1) * 1.1
-
-# Steady state
-z_bar = 1
-kbar = (alpha * z_bar /(1/beta-1+delta))**(1/(1-alpha))
-
-# Grid
-N_k = 50
-N_b = 40
-N_z = 2
-
-k_min = 0.1
-k_max = 1.2*kbar
-
-b_min = 0
-b_max = nu*k_max
-
-b_grid = np.linspace(b_min,b_max,N_b)
-k_grid = np.linspace(k_min,k_max,N_k)
-
-shock = qe.rouwenhorst(N_z, rho, sigma_z)
-P = shock.P
-z_grid = z_bar * np.exp(shock.state_values)
-
-@njit
-def obj_div(k_next, b_next, b, k, z, alpha, delta, r, psi, xi, cf):
-    coh = z * k**alpha + (1-delta) * k - b * (1+r)
-    div = coh - k_next + b_next - cf
-
-    return div
-
-div_max = np.zeros((N_z, N_b, N_k))
-k_max_vec = np.zeros((N_z, N_b, N_k))
-for iz in range(N_z):
-    z = z_grid[iz]
-    for ik in range(N_k):
-        k = k_grid[ik]
-        for ib in range(N_b):
-            b = b_grid[ib]
-            b_next = nu * k_grid[ik] 
-            k_next = (1-delta) * k_grid[ik]
-            div_max[iz,ib,ik] =  z * k**alpha + b_next - b * (1+r) - cf       
-
-np.min(div_max)
-
-exit = div_max < 0
+from setup import * 
 
 """
 VFI 
@@ -249,50 +181,6 @@ def vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, tol = 1e-5
             V = howard(V, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
     return V, k_policy, b_policy 
 
-def _simulate(b0, k0, iz0, k_policy, b_policy, P, z_grid, b_grid, k_grid, T = 100):
-
-    nZ = len(z_grid)
-    b = np.zeros((T))
-    k = np.zeros((T))
-    inv = np.zeros((T))
-    div = np.zeros((T))
-    adj_cost = np.zeros((T))
-    ex = np.zeros((T), dtype = np.int32)
-    iz = np.zeros((T), dtype = np.int32)
-    z = np.zeros((T), dtype = np.int32)
-
-
-    b[0] = b0
-    k[0] = k0   
-    iz[0] = iz0
-
-    for t in range(T):
-        if t < T-1:
-            iz[t+1] = np.random.choice(np.arange(nZ), p=P[iz[t]])
-        z[t] = z_grid[iz[t]]
-        k[t+1] = interp_2d(b_grid,k_grid, k_policy[iz[t]], b[t], k[t])
-        b[t+1] = interp_2d(b_grid,k_grid, b_policy[iz[t]], b[t], k[t])
-        inv[t] = k[t+1] - (1-delta) * k[t]
-        if inv[t] > 0:
-            adj_cost[t] = psi / 2 * (k[t+1] - (1-delta) * k[t])**2 / k[t] + xi * k[t]
-        div[t] = z[t] * k[t]**alpha + (1-delta) * k[t] - b[t] * (1+r) - adj_cost[t] - k[t+1] + b[t+1] - cf 
-        if div[t] < 0:  
-            ex[t:] = 1
-            break 
-
-    return np.array([b, k, ex, div, z, inv, adj_cost, iz])
-
-def simulate(k_policy, b_policy, P, z_grid, b_grid, k_grid, T = 1000, N = 10_000):
-
-    sims = np.zeros((N, 8, T))
-    for i in range(N):
-        k0 = k_grid[-1] #0.1 #np.random.uniform(k_min, k_max)
-        b0 = 0
-        iz0 = 1 #np.random.choice(N_z)
-
-        sims[i] = _simulate(b0, k0, iz0, k_policy, b_policy, P, z_grid, b_grid, k_grid, T = T)
-
-    return sims
 
 k_policy = np.ones((N_z, N_b, N_k)) * k_grid[np.newaxis,np.newaxis,:]
 b_policy = np.ones((N_z, N_b, N_k)) * b_grid[np.newaxis,:,np.newaxis]
