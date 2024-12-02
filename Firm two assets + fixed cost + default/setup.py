@@ -52,13 +52,6 @@ shock = qe.rouwenhorst(N_z, rho, sigma_z)
 P = shock.P
 z_grid = z_bar * np.exp(shock.state_values)
 
-@njit
-def obj_div(k_next, b_next, b, k, z, alpha, delta, r, psi, xi, cf):
-    coh = z * k**alpha + (1-delta) * k - b * (1+r)
-    div = coh - k_next + b_next - cf
-
-    return div
-
 div_max = np.zeros((N_z, N_b, N_k))
 k_max_vec = np.zeros((N_z, N_b, N_k))
 for iz in range(N_z):
@@ -74,3 +67,17 @@ for iz in range(N_z):
 np.min(div_max)
 
 exit = div_max < 0
+
+@njit
+def fast_expectation(Pi, X):
+    
+    res = np.zeros_like(X)
+    X = np.ascontiguousarray(X)
+    
+    for i in range(Pi.shape[0]):
+        for j in range(X.shape[1]):
+            for k in range(X.shape[2]):
+                for l in range(X.shape[0]):
+                    res[i,j,k] += Pi[i,l] * X[l,j,k]
+                            
+    return res

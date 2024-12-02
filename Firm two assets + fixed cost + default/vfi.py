@@ -11,19 +11,6 @@ from setup import *
 VFI 
 """
 
-@njit
-def fast_expectation(Pi, X):
-    
-    res = np.zeros_like(X)
-    X = np.ascontiguousarray(X)
-    
-    for i in range(Pi.shape[0]):
-        for j in range(X.shape[1]):
-            for k in range(X.shape[2]):
-                for l in range(X.shape[0]):
-                    res[i,j,k] += Pi[i,l] * X[l,j,k]
-                            
-    return res
 
 @njit 
 def bellman_invest(b_next, k_next, b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W):
@@ -57,10 +44,10 @@ def bellman_inaction(b_next, b, k, iz, alpha, delta, r, cf, z_grid, b_grid, k_gr
 
 
 @njit
-def grid_search_invest(b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W, Nb_choice = 100, Nk_choice = 100):
+def grid_search_invest(b, k, iz, alpha, delta, psi, xi, nu, r, cf, z_grid, b_grid, k_grid, W, Nb_choice = 100, Nk_choice = 100):
 
     Vmax = -np.inf 
-    b_min = b * (1+r) - z_grid[iz] * k**alpha - cf
+    b_min = b * (1+r) - z_grid[iz] * k**alpha + cf
     if b_min < b_grid[0]:
         b_min = b_grid[0]
     b_max = nu * k
@@ -83,7 +70,7 @@ def grid_search_invest(b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k
     return Vmax, b_max, k_max
 
 @njit
-def grid_search_inaction(b, k, iz, alpha, delta, r, cf, z_grid, b_grid, k_grid, W, Nb_choice = 100):
+def grid_search_inaction(b, k, iz, alpha, delta, nu, r, cf, z_grid, b_grid, k_grid, W, Nb_choice = 100):
 
     Vmax = -np.inf 
     b_min = b * (1+r) - z_grid[iz] * k**alpha 
@@ -103,10 +90,12 @@ def grid_search_inaction(b, k, iz, alpha, delta, r, cf, z_grid, b_grid, k_grid, 
 
 
 @njit(parallel = True)
-def vfi_step(V, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
+def vfi_step(V, beta, psi, xi, delta, alpha, cf, r, nu, P, z_grid, b_grid, k_grid):
     V_new = np.empty_like(V)
     k_policy = np.empty_like(V)
     b_policy = np.empty_like(V)
+
+    N_z, N_b, N_k = V.shape
 
     W = beta * fast_expectation(P, V)
 
@@ -122,8 +111,8 @@ def vfi_step(V, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
                     b = b_grid[ib]
                     k = k_grid[ik]
 
-                    Vinv, b_inv, k_inv = grid_search_invest(b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W)
-                    Vina, b_ina = grid_search_inaction(b, k, iz, alpha, delta, r, cf, z_grid, b_grid, k_grid, W)
+                    Vinv, b_inv, k_inv = grid_search_invest(b, k, iz, alpha, delta, psi, xi, nu, r, cf, z_grid, b_grid, k_grid, W)
+                    Vina, b_ina = grid_search_inaction(b, k, iz, alpha, delta, nu, r, cf, z_grid, b_grid, k_grid, W)
 
                     if Vinv > Vina:
                         V_new[iz, ib, ik] = Vinv
@@ -142,6 +131,8 @@ def vfi_step(V, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
 def howard_step(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
 
     V_new = np.empty_like(W)
+    N_z, N_b, N_k = W.shape
+
     for iz in prange(N_z):
         for ik in range(N_k):
             for ib in range(N_b):
@@ -160,7 +151,7 @@ def howard_step(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_g
                     
     return V_new
 
-def howard(V, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
+def howard(V, k_policy, b_policy, beta, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
 
     for n in range(50):
         W = beta * fast_expectation(P, V)
@@ -168,79 +159,16 @@ def howard(V, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, 
 
     return V
 
-def vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, tol = 1e-5, do_howard = True):
+def vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-5, do_howard = True):
     error = 1
 
     V = V_init.copy()
     while error > tol:
-        Vnew, k_policy, b_policy = vfi_step(V, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
+        Vnew, k_policy, b_policy = vfi_step(V, beta, psi, xi, delta, alpha, cf, r, nu, P, z_grid, b_grid, k_grid)
         error = np.sum(np.abs(Vnew - V))
         print(error)
         V = Vnew
         if do_howard:
-            V = howard(V, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
+            V = howard(V, k_policy, b_policy, beta, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
     return V, k_policy, b_policy 
 
-
-k_policy = np.ones((N_z, N_b, N_k)) * k_grid[np.newaxis,np.newaxis,:]
-b_policy = np.ones((N_z, N_b, N_k)) * b_grid[np.newaxis,:,np.newaxis]
-
-V_init = np.zeros((N_z, N_b, N_k))
-V, k_policy, b_policy = vfi(V_init, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, do_howard = True)
-
-sim = simulate(0, 0.1, 0, k_policy, b_policy, P, z_grid, b_grid, k_grid, T = 100)
-plt.plot(k_grid, k_policy[0,0,:], label = 'k_policy')
-plt.plot(k_grid, b_policy[0,0,:], label = 'b_policy')
-
-plt.legend()
-plt.xlabel('k')
-plt.title('Policy function for iz = 0, ib  0')
-plt.show()
-
-fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-axes[0].plot(k_grid, (1-exit[0,0,:])*(k_policy[0, 0, :] - (1 - delta) * k_grid), label='Net investment with low TFP')
-axes[0].plot(k_grid, (1-exit[-1,0,:])*(k_policy[-1, 0, :] - (1 - delta) * k_grid), label='Net investment with high TFP')
-axes[0].legend()
-axes[0].set_xlabel('k')
-axes[0].set_title('Net investment in the absence of debt')
-axes[1].plot(k_grid, (1-exit[0,-10,:])*(k_policy[0, -10, :] - (1 - delta) * k_grid), label='Net investment with low TFP')
-axes[1].plot(k_grid, (1-exit[-1,-10,:])*(k_policy[-1, -10, :] - (1 - delta) * k_grid), label='Net investment with high TFP')
-axes[1].legend()
-axes[1].set_xlabel('k')
-axes[1].set_title('Net investment when high debt')
-plt.tight_layout()
-plt.show()
-
-fig, axes = plt.subplots(1, 2, figsize=(12, 6))
-axes[0].plot(b_grid,(1- exit[0,:,0])*(b_policy[0, :, 0]-b_grid), label='Debt choice with low TFP')
-axes[0].plot(b_grid, (1-exit[-1,:,0])*(b_policy[-1, :, 0]-b_grid), label='Debt choice with high TFP')
-axes[0].legend()
-axes[0].set_xlabel('debt')
-axes[0].set_ylabel('net dissaving')
-axes[0].set_title('Debt choice with low capital')
-
-axes[1].plot(b_grid, (1- exit[0,:,-1])*(b_policy[0, :, -1]-b_grid), label='Debt choice with low TFP')
-axes[1].plot(b_grid, (1- exit[-1,:,-1])*(b_policy[-1, :, -1]-b_grid), label='Debt choice with high TFP')
-axes[1].legend()
-axes[1].set_xlabel('debt')
-axes[1].set_title('Debt choice with high capital')
-plt.tight_layout()
-plt.show()
-
-
-
-coh = z_grid[:,np.newaxis,np.newaxis] * k_grid[np.newaxis,np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,np.newaxis,:] - b_grid[np.newaxis,:,np.newaxis] * (1+r) 
-adj_cost = psi / 2 * (k_policy - (1-delta) * k_grid[np.newaxis,np.newaxis,:])*2 / k_grid[np.newaxis,np.newaxis,:] + xi * k_grid[np.newaxis,np.newaxis,:]
-div_opt = (1-exit) * (coh - adj_cost - k_policy + b_policy - cf )
-
-B_grid, K_grid = np.meshgrid(b_grid, k_grid)
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_surface(B_grid, K_grid, exit[0,:,:].T, cmap='viridis', edgecolor='k')
-
-ax.set_xlabel('Debt')
-ax.set_ylabel('Capital')
-ax.set_zlabel('Exit')
-plt.title("3D Plot of a Binary Variable")
-plt.show()
-#Exit (1) when debt is high and capital is low, the non-negativity constraint on dividend cannot hold
