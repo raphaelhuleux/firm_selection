@@ -14,11 +14,11 @@ k_policy = np.ones((N_z, N_b, N_k)) * k_grid[np.newaxis,np.newaxis,:]
 b_policy = np.ones((N_z, N_b, N_k)) * b_grid[np.newaxis,:,np.newaxis]
 
 V_init = np.zeros((N_z, N_b, N_k))
-V_vfi, k_policy_vfi, b_policy_vfi = vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
+#V_vfi, k_policy_vfi, b_policy_vfi = vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
 V_nvfi, k_policy_nvfi, b_policy_nvfi = nvfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-5)
 
-plt.plot(k_grid, k_policy_vfi[0,0,:], label = 'vfi')
-plt.plot(k_grid, k_policy_nvfi[0,0,:], label = 'nvfi')
+#plt.plot(k_grid, k_policy_vfi[0,0,:] - (1-delta)*k_grid, label = 'vfi')
+plt.plot(k_grid, k_policy_nvfi[0,0,:] - (1-delta)*k_grid, label = 'nvfi')
 
 plt.legend()
 plt.xlabel('k')
