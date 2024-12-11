@@ -6,18 +6,18 @@ from consav.linear_interp_2d import interp_2d
 from numba import njit, prange
 import quantecon as qe 
 from setup import * 
+from setup import fast_expectation, compute_adjustment_cost
 
 """
 VFI 
 """
-
 
 @njit 
 def bellman_invest(b_next, k_next, b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W):
     z = z_grid[iz]
 
     coh = z * k**alpha + (1-delta) * k - b * (1+r)
-    adj_cost = psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
+    adj_cost = compute_adjustment_cost(k_next, k, psi, xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
     div = coh - adj_cost - k_next + b_next - cf
 
     if b_next > nu * k_next:
@@ -106,7 +106,7 @@ def vfi_step(V, beta, psi, xi, delta, alpha, cf, r, nu, P, z_grid, b_grid, k_gri
         for ik in range(N_k):
             for ib in range(N_b):
 
-                if exit[iz,ib, ik]:
+                if exit_keep[iz,ib, ik]:
                     V_new[iz, ib, ik] = 0
                     k_policy[iz, ib, ik] = 0
                     b_policy[iz, ib, ik] = 0
@@ -173,5 +173,9 @@ def vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_gri
         V = Vnew
         if do_howard:
             V = howard(V, k_policy, b_policy, beta, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid)
-    return V, k_policy, b_policy 
 
+    inaction = (k_policy == (1-delta)*k_grid[np.newaxis,np.newaxis,:])
+    coh = z_grid[:,np.newaxis,np.newaxis] * k_grid[np.newaxis,np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,np.newaxis,:] - b_grid[np.newaxis,:,np.newaxis] * (1+r) 
+    adj_cost = compute_adjustment_cost(k_policy, k_grid[np.newaxis,np.newaxis,:], psi, xi) 
+    div_opt = (1-exit_keep) * (coh - adj_cost*(1-inaction) - k_policy + b_policy - cf )
+    return V, k_policy, b_policy, inaction, div_opt

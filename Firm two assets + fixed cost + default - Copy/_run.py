@@ -12,22 +12,28 @@ from nvfi import *
 
 
 V_init = np.zeros((N_z, N_b, N_k))
-V_vfi, k_policy_vfi, b_policy_vfi = vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
-V_nvfi, k_policy_nvfi, b_policy_nvfi = nvfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-5)
+V_vfi, k_policy_vfi, b_policy_vfi, inaction_vfi, div_vfi = vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
+V, k_policy, b_policy, inaction, div = nvfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-5)
 
-exit_nvfi = (b_policy_nvfi > 0).astype(int)
-inaction_nvfi = (b_policy_nvfi == b_grid).astype(int)
-inaction_nvfi2 = (b_policy_nvfi == nu*k_policy_nvfi).astype(int)
+#print('dividends minimum vfi = ', np.min(div_vfi))
+print('dividends minimum nvfi = ', np.min(div))
 
-#plt.plot(k_grid, k_policy_vfi[0,0,:] - (1-delta)*k_grid, label = 'vfi')
-plt.plot(k_grid, k_policy_nvfi[0,0,:] - (1-delta)*k_grid, label = 'nvfi')
+i_min = np.argwhere(div == np.min(div))
+iz, ib, ik = i_min[0]
+
+plt.plot(k_grid, div[iz,ib,:], label = 'vfi')
+
+plt.plot(k_grid, k_policy_vfi[0,0,:] - (1-delta)*k_grid, label = 'vfi')
+plt.plot(k_grid, k_policy[0,0,:] - (1-delta)*k_grid, label = 'nvfi')
 plt.legend()
 plt.xlabel('k')
 plt.title('Policy function for capital investment iz = 0, ib =0')
 plt.show()
 
-plt.plot(b_grid, b_policy_nvfi[0,:,10], label = 'nvfi')
-plt.plot(b_grid,nu*k_policy_nvfi[0,:,10])
+plt.plot(b_grid, b_policy[0,:,10], label = "b'")
+plt.plot(b_grid, b_policy_vfi[0,:,10], label = "b'", linestyle = ':', color = 'C0')
+plt.plot(b_grid,nu*k_policy[0,:,10], label = "nu * k'", color = 'C1')
+plt.plot(b_grid,nu*k_policy_vfi[0,:,10], label = "nu * k'", linestyle = ':', color = 'C1')
 plt.legend()
 plt.xlabel('b')
 plt.ylabel('bprime ')
@@ -64,10 +70,6 @@ axes[1].set_title('Debt choice with high capital')
 plt.tight_layout()
 plt.show()
 
-inaction_inv_nvfi = (k_policy_nvfi == (1-delta)*k_grid[np.newaxis,np.newaxis,:]).astype(int)
-coh = z_grid[:,np.newaxis,np.newaxis] * k_grid[np.newaxis,np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,np.newaxis,:] - b_grid[np.newaxis,:,np.newaxis] * (1+r) 
-adj_cost = psi / 2 * (k_policy_nvfi - (1-delta) * k_grid[np.newaxis,np.newaxis,:])*2 / k_grid[np.newaxis,np.newaxis,:] + xi * k_grid[np.newaxis,np.newaxis,:]
-div_opt = (1-exit) * (coh - adj_cost*(1-inaction_inv_nvfi) - k_policy_nvfi + b_policy_nvfi - cf )
 
 B_grid, K_grid = np.meshgrid(b_grid, k_grid)
 fig = plt.figure()
