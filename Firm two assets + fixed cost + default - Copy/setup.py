@@ -76,7 +76,7 @@ div_max_adj = np.zeros((N_z, N_b, N_k))
 k_max_adj = np.zeros((N_z, N_b, N_k))
 
 @nb.njit
-def objective_div_max_inv(k_next, k, b):
+def objective_div_max_inv(k_next, z, k, b):
     b_next = nu * k_next
     adj_cost = compute_adjustment_cost(k_next, k, psi, xi) 
     coh = z * k**alpha + (1-delta) * k - b * (1+r)
@@ -93,13 +93,13 @@ for iz in range(N_z):
             b_next = nu * (1-delta) * k_grid[ik] 
             k_next = (1-delta) * k_grid[ik]
             div_max_keep[iz,ib,ik] =  z * k**alpha + b_next - b * (1+r) - cf     
-            div_max_adj[iz,ib,ik] = objective_div_max_inv(k_next, k, b)
+            div_max_adj[iz,ib,ik] = objective_div_max_inv(k_next, z, k, b)
 
             if div_max_adj[iz,ib,ik] > 0:
-                if objective_div_max_inv(k_grid[-1], k, b) > 0:
+                if objective_div_max_inv(k_grid[-1], z, k, b) > 0:
                     k_max_adj[iz,ib,ik] = k_grid[-1]
                 else:
-                    res = qe.optimize.root_finding.bisect(objective_div_max_inv, (1-delta)*k, k_grid[-1], args = (k, b))  
+                    res = qe.optimize.root_finding.bisect(objective_div_max_inv, (1-delta)*k, k_grid[-1], args = (z, k, b))  
                     k_max_adj[iz,ib,ik] = res.root
 
 exit_keep = div_max_keep < 0

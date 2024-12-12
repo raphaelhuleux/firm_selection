@@ -231,12 +231,7 @@ def howard_step_nvfi(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid
                     if k_next == (1-delta) * k:
                         V_new[iz, ib, ik] = -bellman_keep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
                     else:
-                        #adj_cost = psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
-                        #y_diff = z * (k_next / (1-delta))**alpha - z * k**alpha
-                        #b_tilde = b + (adj_cost + y_diff + k_next - (1-delta) * k) / (1+r)
-                        #V_new[iz, ib, ik] = -bellman_keep(b_next, b_tilde, k_next/(1-delta), iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
                         V_new[iz, ib, ik] = bellman_invest(b_next, k_next, b, k, z, iz, psi, xi, delta, alpha, r, cf, b_grid, k_grid, W)
-        
     return V_new
 
 def howard_nvfi(V, k_policy, b_policy, beta, P, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid, tol = 1e-4, iter_max = 1000):
@@ -247,7 +242,7 @@ def howard_nvfi(V, k_policy, b_policy, beta, P, psi, xi, delta, alpha, cf, r, z_
 
     return V 
 
-def nvfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-5):
+def nvfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4):
     error = 1
 
     V = V_init.copy()

@@ -139,7 +139,7 @@ def howard_step(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_g
     for iz in prange(N_z):
         for ik in range(N_k):
             for ib in range(N_b):
-                if exit[iz,ib, ik]:
+                if exit_keep[iz,ib, ik]:
                     V_new[iz, ib, ik] = 0
                 else:
                     b = b_grid[ib]
@@ -162,7 +162,7 @@ def howard(V, k_policy, b_policy, beta, psi, xi, delta, alpha, cf, r, z_grid, b_
 
     return V
 
-def vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-5, do_howard = True):
+def vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4, do_howard = True):
     error = 1
 
     V = V_init.copy()
