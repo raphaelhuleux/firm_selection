@@ -24,7 +24,7 @@ delta = 0.1
 rho = 0.8
 sigma_z = 0.2
 psi = 0.05
-xi = 0.01
+xi = 0.001
 cf = 0.1
 
 nu = 0.9
@@ -40,7 +40,7 @@ N_b = 100
 N_z = 5
 
 k_min = 0.1
-k_max = 1.2*kbar
+k_max = 2*kbar
 
 b_min = 0
 b_max = nu*k_max

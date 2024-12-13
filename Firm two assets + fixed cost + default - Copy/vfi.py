@@ -12,7 +12,7 @@ from setup import fast_expectation, compute_adjustment_cost
 VFI 
 """
 
-@njit 
+#@njit 
 def bellman_invest(b_next, k_next, b, k, iz, alpha, delta, psi, xi, r, cf, z_grid, b_grid, k_grid, W):
     z = z_grid[iz]
 
