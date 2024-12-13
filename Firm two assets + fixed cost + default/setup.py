@@ -24,7 +24,7 @@ delta = 0.1
 rho = 0.8
 sigma_z = 0.2
 psi = 0.05
-xi = 0.01
+xi = 0.001
 cf = 0.1
 
 nu = 0.9
@@ -40,7 +40,7 @@ N_b = 100
 N_z = 5
 
 k_min = 0.1
-k_max = 1.2*kbar
+k_max = 2*kbar
 
 b_min = 0
 b_max = nu*k_max
@@ -74,6 +74,19 @@ def fast_expectation(Pi, X):
 div_max_keep = np.zeros((N_z, N_b, N_k))
 div_max_adj = np.zeros((N_z, N_b, N_k))
 k_max_adj = np.zeros((N_z, N_b, N_k))
+
+@njit 
+def profit_adj_fun(k_next, b_next, z, b, k, psi, xi, r, cf):
+    adj_cost = compute_adjustment_cost(k_next, k, psi, xi) 
+    coh = z * k**alpha + (1-delta) * k - b * (1+r)
+    div = coh - adj_cost - k_next + b_next - cf
+    return div 
+
+@njit 
+def profit_keep_fun(b_next, z, b, k, r, cf):
+    coh = z * k**alpha  - b * (1+r)
+    div = coh + b_next - cf
+    return div 
 
 @nb.njit
 def objective_div_max_inv(k_next, z, k, b):

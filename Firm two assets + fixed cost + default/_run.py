@@ -7,16 +7,20 @@ from consav.linear_interp_2d import interp_2d
 from numba import njit, prange
 import quantecon as qe 
 from setup import * 
-from vfi import *
-from nvfi import * 
+from vfi import solve_vfi
+from nvfi import solve_nvfi
+from nvfi_analytical import solve_nvfi_analytical
 
 
 V_init = np.zeros((N_z, N_b, N_k))
-V_vfi, k_policy_vfi, b_policy_vfi, inaction_vfi, div_vfi = vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
-V, k_policy, b_policy, inaction, div = nvfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4)
+V_vfi, k_policy_vfi, b_policy_vfi, inaction_vfi, div_vfi = solve_vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
+V, k_policy, b_policy, inaction, div = solve_nvfi_analytical(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4)
 
 print('dividends minimum vfi = ', np.min(div_vfi))
 print('dividends minimum nvfi = ', np.min(div))
+
+np.max(np.abs(k_policy_vfi - k_policy))
+np.max(np.abs(b_policy_vfi - b_policy))
 
 i_min = np.argwhere(div == np.min(div))
 iz, ib, ik = i_min[0]

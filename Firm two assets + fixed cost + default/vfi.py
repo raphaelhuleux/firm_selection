@@ -46,17 +46,14 @@ def bellman_inaction(b_next, b, k, iz, alpha, delta, r, cf, z_grid, b_grid, k_gr
 
 
 @njit
-def grid_search_invest(b, k, iz, alpha, delta, psi, xi, nu, r, cf, z_grid, b_grid, k_grid, W, Nb_choice = 100, Nk_choice = 100):
+def grid_search_invest(b, k, iz, k_max, alpha, delta, psi, xi, nu, r, cf, z_grid, b_grid, k_grid, W, Nb_choice = 100, Nk_choice = 100):
 
     Vmax = -np.inf 
 
     k_min = (1-delta) * k + 1e-8
-    k_max = k_grid[-1]
     k_choice = np.linspace(k_min, k_max, Nk_choice)
 
-    b_min = b * (1+r) - z_grid[iz] * k**alpha + cf
-    if b_min < b_grid[0]:
-        b_min = b_grid[0]
+    b_min = max(b * (1+r) - z_grid[iz] * k**alpha + cf, b_grid[0])
     b_max = nu * k_max 
     b_choice = np.linspace(b_min, b_max, Nb_choice)
 
@@ -114,7 +111,7 @@ def vfi_step(V, beta, psi, xi, delta, alpha, cf, r, nu, P, z_grid, b_grid, k_gri
                     b = b_grid[ib]
                     k = k_grid[ik]
 
-                    Vinv, b_inv, k_inv = grid_search_invest(b, k, iz, alpha, delta, psi, xi, nu, r, cf, z_grid, b_grid, k_grid, W)
+                    Vinv, b_inv, k_inv = grid_search_invest(b, k, iz, k_max_adj[iz,ib,ik], alpha, delta, psi, xi, nu, r, cf, z_grid, b_grid, k_grid, W)
                     Vina, b_ina = grid_search_inaction(b, k, iz, alpha, delta, nu, r, cf, z_grid, b_grid, k_grid, W)
 
                     if Vinv > Vina:
@@ -162,7 +159,7 @@ def howard(V, k_policy, b_policy, beta, psi, xi, delta, alpha, cf, r, z_grid, b_
 
     return V
 
-def vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4, do_howard = True):
+def solve_vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4, do_howard = True):
     error = 1
 
     V = V_init.copy()
