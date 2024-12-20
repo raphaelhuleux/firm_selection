@@ -1,4 +1,3 @@
-
 import numpy as np 
 import numba as nb 
 import matplotlib.pyplot as plt
@@ -10,11 +9,33 @@ from setup import *
 from vfi import solve_vfi
 from nvfi import solve_nvfi
 from nvfi_analytical import solve_nvfi_analytical
-
+from simulate import simulate
 
 V_init = np.zeros((N_z, N_b, N_k))
-V_vfi, k_policy_vfi, b_policy_vfi, inaction_vfi, div_vfi = solve_vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
 V, k_policy, b_policy, inaction, div = solve_nvfi_analytical(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid, tol = 1e-4)
+#b, k, ex, div, z, inv, adj_cost, iz = _simulate(b_grid[0], k_grid[20], 3, k_policy, b_policy, delta, alpha, xi, cf, psi, r, P, z_grid, b_grid, k_grid, T = 100)
+sims, avg, avg_svg = simulate(k_policy, b_policy, delta, alpha, xi, cf, psi, r, P, z_grid, b_grid, k_grid, T = 10000, N = 1000)
+
+fig, axs = plt.subplots(2, 2, figsize=(10, 8)) 
+fig.tight_layout(pad=4.0)  
+labels = ['average debt holding', 'average capital holding',
+          'average profit', 'average share of exit']
+for i, ax in enumerate(axs.flat): 
+    if i < 3:
+        ax.plot(avg_svg[i, :-1], label=labels[i])
+        ax.set_title(labels[i])  
+        ax.legend()              
+        ax.grid(True)            
+    else:
+        ax.plot(avg[i, :-1], label=labels[i])
+        ax.set_title(labels[i]) 
+        ax.legend()              
+        ax.grid(True)            
+        
+plt.show()
+
+
+V_vfi, k_policy_vfi, b_policy_vfi, inaction_vfi, div_vfi = solve_vfi(V_init, beta, nu, psi, xi, delta, alpha, cf, r, P, z_grid, b_grid, k_grid)
 
 print('dividends minimum vfi = ', np.min(div_vfi))
 print('dividends minimum nvfi = ', np.min(div))
@@ -87,3 +108,4 @@ ax.set_zlabel('Exit')
 plt.title("3D Plot of a Binary Variable")
 plt.show()
 #Exit (1) when debt is high and capital is low, the non-negativity constraint on dividend cannot hold
+

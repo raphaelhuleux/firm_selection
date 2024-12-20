@@ -53,20 +53,9 @@ def solve_keep(W, delta, cf, nu, alpha, r, z_grid, b_grid, k_grid):
                     coh = z * k**alpha - b * (1+r)
 
                     b_next =  max(-coh + cf , b_grid[0])
-                    #b_min = max(-coh + cf , b_grid[0])
-                    #b_max = nu * (1-delta) * k 
-
-                    #V_b_min = bellman_keep(b_min, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
-                    #V_b_max = bellman_keep(b_max, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
-
-                    #if V_b_min > V_b_max:
-                    #    b_policy[iz,ib,ik] = b_min
-                    #else:
-                    #    b_policy[iz,ib,ik] = b_max 
 
                     k_policy[iz,ib,ik] = k_next
                     b_policy[iz,ib,ik] = b_next
-                    #V_new[iz,ib,ik] = max(V_b_min, V_b_max)
                     V_new[iz,ib,ik] = bellman_keep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
 
     return V_new, k_policy, b_policy
@@ -98,22 +87,6 @@ def b_next_analytical(k_next, b, k, iz, r, nu, delta, alpha, cf, psi, xi, b_grid
     adj_cost = compute_adjustment_cost(k_next, k, psi, xi)
 
     return min(max(-coh + cf + adj_cost + k_next, b_grid[0]), nu * k_next)
-    """ 
-    b_next_max = nu * k_next
-
-    div_min = coh + b_next_min - adj_cost - k_next - cf
-    div_max = coh + b_next_max - adj_cost - k_next - cf
-
-    V_div_min = div_min + interp_2d(b_grid, k_grid, W[iz], b_next_min, k_next)
-    V_div_max = div_max + interp_2d(b_grid, k_grid, W[iz], b_next_max, k_next)
-
-    if V_div_min > V_div_max:
-        b_next = b_next_min
-    else: 
-        b_next = b_next_max 
-
-    return b_next
-    """
 
 @njit
 def dividend_constraint(k_next, b, k, iz, alpha, cf, delta, psi, xi, nu, r, z_grid, k_grid, b_grid, W):
@@ -149,29 +122,20 @@ def solve_adj(W, alpha, psi, xi, delta, cf, nu, r, z_grid, b_grid, k_grid):
                     k = k_grid[ik]
                     k_min = (1-delta) * k 
                     k_max = k_max_adj[iz,ib,ik]
-
                     div_max = dividend_constraint(k_min, b, k, iz, alpha, cf, delta, psi, xi, nu, r, z_grid, k_grid, b_grid, W)
-                    div_min = dividend_constraint(k_max, b, k, iz, alpha, cf, delta, psi, xi, nu, r, z_grid, k_grid, b_grid, W)
-
+                    
                     if div_max < 0:
                         V_new[iz, ib, ik] = 0 
                         k_policy[iz, ib, ik] = 0
                         b_policy[iz, ib, ik] = 0
                     else:
-                        #k_max = k_max_adj[iz,ib,ik] # k_grid[-1]
-                        #if div_min < 0:
-                            #res = qe.optimize.root_finding.brentq(dividend_constraint, (1-delta)*k, k_max, args = (b, k, iz, alpha, cf, delta, psi, xi, nu, r, z_grid, k_grid, b_grid, W))  
-                            #k_max_eff = res.root
-                        #else:
                         k_max_eff = k_max   
                         k_opt = golden_section_search.optimizer(bellman_adj, k_min, k_max_eff, args = (b, k, iz, alpha, delta, psi, xi, r, cf, nu, z_grid, k_grid, b_grid, W))
         
                         k_policy[iz, ib, ik] = k_opt
                         b_policy[iz, ib, ik] = b_next_analytical(k_opt, b, k, iz, r, nu, delta, alpha, cf, psi, xi, b_grid, k_grid, z_grid, W)
                         V_new[iz, ib, ik] = -bellman_adj(k_policy[iz, ib, ik],b, k, iz, alpha, delta, psi, xi, r, cf, nu, z_grid, k_grid, b_grid, W)
-                        #V_new[iz,ib,ik] = bellman_invest(b_policy[iz, ib, ik], k_policy[iz, ib, ik], b, k, z, iz, psi, xi, delta, alpha, r, cf, b_grid, k_grid, W)
-                        
-
+                       
     return V_new, k_policy, b_policy
 
 def nvfi_step_analytical(V, beta, psi, xi, delta, alpha, cf, r, nu, P, z_grid, b_grid, k_grid):
