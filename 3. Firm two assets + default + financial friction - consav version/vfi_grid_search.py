@@ -55,6 +55,9 @@ def grid_search_invest(b, k, iz, k_max, W, par, sol, Nb_choice = 60, Nk_choice =
         b_choice = np.linspace(par.b_grid[0], b_max, Nb_choice)
         for b_next in b_choice:
             V = bellman_invest(b_next, k_next, b, k, iz, par, sol, W)
+            q = debt_price_function(iz, k_next, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
+            if q == 0.0:
+                break
             if V > Vmax:
                 Vmax = V
                 b_opt = b_next
@@ -68,9 +71,14 @@ def grid_search_inaction(b, k, iz, b_min, W, par, sol, Nb_choice = 60):
     Vmax = -np.inf 
     b_max = par.nu * (1-par.delta) * k
     b_choice = np.linspace(b_min, b_max, Nb_choice)
+    b_opt = 0.0
     
     for b_next in b_choice:
         V = bellman_inaction(b_next, b, k, iz, par, sol, W)
+        q = debt_price_function(iz, (1-par.delta)*k, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
+        if q == 0.0:
+            break
+
         if V > Vmax:
             Vmax = V
             b_opt = b_next

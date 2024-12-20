@@ -18,18 +18,19 @@ class HeterogenousFirmsModelClass(EconModelClass):
         
         par = self.par
         algo = self.algo
-        
+
+        # Parameters
         par.alpha = 1/3 # capital share
         par.beta = 0.95 # discount factor
-        par.delta = 0.1
+        par.delta = 0.1 # depreciation rate
 
-        par.rho = 0.8
-        par.sigma_z = 0.2
-        par.psi = 0.05
-        par.xi = 0.0001
-        par.cf = 0.1
+        par.rho = 0.8 # AR(1) shock
+        par.sigma_z = 0.2 # std. dev. of shock
+        par.psi = 0.05 # convex adjustment cost
+        par.xi = 0.0001 # fixed adjustment cost
+        par.cf = 0.1 # fixed cost
 
-        par.nu = 0.9
+        par.nu = 0.9 # leverage ratio
         par.r = (1/par.beta - 1) * 1.1
 
         # Steady state
@@ -82,6 +83,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         sol.V = np.zeros((par.Nz, par.Nb, par.Nk))
     
     def prepare(self): # required
+        """ precompute specific arrays before solving the model"""
         with jit(self) as model:
             par = model.par
             sol = model.sol
@@ -91,7 +93,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
             compute_k_max(par, sol)
 
     def solve(self): # user-defined
-        """ solve the model"""
+        """ solve the model """
         with jit(self) as model:
             par = model.par
             sol = model.sol

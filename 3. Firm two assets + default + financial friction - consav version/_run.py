@@ -24,8 +24,9 @@ k_grid = par.k_grid
 b_grid = par.b_grid
 z_grid = par.z_grid
 
-plt.plot(k_grid, k_policy[:,0,:].T - (1-par.delta)*k_grid[:,np.newaxis])
-plt.plot(k_grid, b_policy[:,0,:].T)
+plt.plot(k_grid, k_policy[:,0,:].T - (1-par.delta)*k_grid[:,np.newaxis], label = 'k_policy')
+plt.plot(k_grid, b_policy[:,0,:].T, label = 'b_policy')
+plt.legend()
 plt.show()
 
 plt.plot(k_grid, b_policy[0,0,:].T, label = 'b_policy')
