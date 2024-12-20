@@ -1,10 +1,6 @@
 import numpy as np 
-import numba as nb 
-import matplotlib.pyplot as plt
-import quantecon as qe 
 from consav.linear_interp_2d import interp_2d
 from numba import njit, prange
-import quantecon as qe 
 from model_functions import * 
 
 """
@@ -88,27 +84,27 @@ def vfi_step(V, par, sol):
     k_policy = np.empty_like(V)
     b_policy = np.empty_like(V)
 
-    N_z, N_b, N_k = V.shape
+    Nz, Nb, Nk = V.shape
 
     W = par.beta * fast_expectation(par.P, V)
 
-    for iz in prange(N_z):
-        for ik in range(N_k):
-            for ib in range(N_b):
+    for iz in prange(Nz):
+        for ik in range(Nk):
+            for ib in range(Nb):
 
                 if sol.exit_policy[iz,ib, ik]:
-                    V_new[iz, ib, ik] = 0
-                    k_policy[iz, ib, ik] = 0
-                    b_policy[iz, ib, ik] = 0
+                    V_new[iz, ib, ik] = 0.0
+                    k_policy[iz, ib, ik] = 0.0
+                    b_policy[iz, ib, ik] = 0.0
                 else:
                     b = par.b_grid[ib]
                     k = par.k_grid[ik]
 
                     k_max = sol.k_max_adj[iz, ib, ik]
-                    Vinv, b_inv, k_inv = grid_search_invest(b, k, iz, k_max, W, par, sol)
+                    Vinv, b_inv, k_inv = grid_search_invest(b, k, iz, k_max, W, par, sol, Nb_choice = par.Nb_choice, Nk_choice = par.Nk_choice)
 
                     b_min_keep = sol.b_min_keep[iz, ib, ik]
-                    Vina, b_ina = grid_search_inaction(b, k, iz, b_min_keep, W, par, sol)
+                    Vina, b_ina = grid_search_inaction(b, k, iz, b_min_keep, W, par, sol, Nb_choice = par.Nb_choice)
 
                     if Vinv > Vina:
                         V_new[iz, ib, ik] = Vinv
@@ -125,7 +121,7 @@ def vfi_step(V, par, sol):
 def solve_vfi_grid_search(par, sol, tol = 1e-4, do_howard = True):
     error = 1
 
-    V_init = np.zeros((par.N_z, par.N_b, par.N_k))
+    V_init = np.zeros((par.Nz, par.Nb, par.Nk))
     V = V_init.copy()
     while error > tol:
         Vnew, k_policy, b_policy = vfi_step(V, par, sol)
@@ -139,20 +135,20 @@ def solve_vfi_grid_search(par, sol, tol = 1e-4, do_howard = True):
     sol.k_policy[...] = k_policy
     sol.b_policy[...] = b_policy
     sol.V[...] = V
-    compute_optimal_dividends(b_policy, k_policy, par, sol)
+    compute_optimal_div_policy(b_policy, k_policy, par, sol)
 
 
 @njit(parallel = True)
 def howard_step(W, k_policy, b_policy, par, sol):
 
     V_new = np.empty_like(W)
-    N_z, N_b, N_k = W.shape
+    Nz, Nb, Nk = W.shape
 
-    for iz in prange(N_z):
-        for ik in range(N_k):
-            for ib in range(N_b):
+    for iz in prange(Nz):
+        for ik in range(Nk):
+            for ib in range(Nb):
                 if sol.exit_policy[iz,ib, ik]:
-                    V_new[iz, ib, ik] = 0
+                    V_new[iz, ib, ik] = 0.0
                 else:
                     b = par.b_grid[ib]
                     k = par.k_grid[ik]

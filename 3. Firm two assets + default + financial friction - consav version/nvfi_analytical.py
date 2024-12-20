@@ -15,7 +15,7 @@ Nested-VFI
 """
    
 @njit 
-def bellman_keep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W):
+def bellmaNkeep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W):
     coh = k**alpha * z_grid[iz] - b * (1+r)
     k_next = (1-delta) * k
     div = coh + b_next - cf
@@ -32,17 +32,17 @@ def bellman_keep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, 
 @njit
 def solve_keep(W, delta, cf, nu, alpha, r, z_grid, b_grid, k_grid):
 
-    N_z, N_b, N_k = W.shape
+    Nz, Nb, Nk = W.shape
 
-    V_new = np.zeros((N_z, N_b, N_k))
-    k_policy = np.zeros((N_z, N_b, N_k))
-    b_policy = np.zeros((N_z, N_b, N_k))
+    V_new = np.zeros((Nz, Nb, Nk))
+    k_policy = np.zeros((Nz, Nb, Nk))
+    b_policy = np.zeros((Nz, Nb, Nk))
 
-    for iz in range(N_z):
+    for iz in range(Nz):
         z = z_grid[iz]
-        for ib in range(N_b):
+        for ib in range(Nb):
             b = b_grid[ib]
-            for ik in range(N_k): 
+            for ik in range(Nk): 
                 if exit_keep[iz,ib,ik]:
                     V_new[iz,ib,ik] = 0
                     k_policy[iz,ib,ik] = 0
@@ -56,8 +56,8 @@ def solve_keep(W, delta, cf, nu, alpha, r, z_grid, b_grid, k_grid):
                     #b_min = max(-coh + cf , b_grid[0])
                     #b_max = nu * (1-delta) * k 
 
-                    #V_b_min = bellman_keep(b_min, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
-                    #V_b_max = bellman_keep(b_max, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
+                    #V_b_min = bellmaNkeep(b_min, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
+                    #V_b_max = bellmaNkeep(b_max, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
 
                     #if V_b_min > V_b_max:
                     #    b_policy[iz,ib,ik] = b_min
@@ -67,7 +67,7 @@ def solve_keep(W, delta, cf, nu, alpha, r, z_grid, b_grid, k_grid):
                     k_policy[iz,ib,ik] = k_next
                     b_policy[iz,ib,ik] = b_next
                     #V_new[iz,ib,ik] = max(V_b_min, V_b_max)
-                    V_new[iz,ib,ik] = bellman_keep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
+                    V_new[iz,ib,ik] = bellmaNkeep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
 
     return V_new, k_policy, b_policy
 
@@ -79,7 +79,7 @@ def bellman_adj(k_next, b, k, iz, alpha, delta, psi, xi, r, cf, nu, z_grid, k_gr
     coh = z * k**alpha - b * (1+r) + (1-delta) * k 
     adj_cost = psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
 
-    # Compute dividends
+    # Compute div_policy
     b_next = b_next_analytical(k_next, b, k, iz, r, nu, delta, alpha, cf, psi, xi, b_grid, k_grid, z_grid, W)
     div = coh + b_next - adj_cost - k_next - cf 
 
@@ -123,24 +123,24 @@ def dividend_constraint(k_next, b, k, iz, alpha, cf, delta, psi, xi, nu, r, z_gr
     adj_cost = compute_adjustment_cost(k_next, k, psi, xi)
     b_next = b_next_analytical(k_next, b, k, iz, r, nu, delta, alpha, cf, psi, xi, b_grid, k_grid, z_grid, W)
     
-    # Compute dividends
+    # Compute div_policy
     coh = z * k**alpha - b * (1+r) + (1-delta) * k
     div = coh + b_next - adj_cost - k_next - cf
     return div 
 
 @njit
 def solve_adj(W, alpha, psi, xi, delta, cf, nu, r, z_grid, b_grid, k_grid):
-    N_z, N_b, N_k = W.shape
+    Nz, Nb, Nk = W.shape
 
-    V_new = np.zeros((N_z, N_b, N_k))
-    k_policy =  np.zeros((N_z, N_b, N_k))
-    b_policy =  np.zeros((N_z, N_b, N_k))
+    V_new = np.zeros((Nz, Nb, Nk))
+    k_policy =  np.zeros((Nz, Nb, Nk))
+    b_policy =  np.zeros((Nz, Nb, Nk))
 
-    for iz in prange(N_z):
+    for iz in prange(Nz):
         z = z_grid[iz]
-        for ib in range(N_b):
+        for ib in range(Nb):
             b = b_grid[ib]
-            for ik in range(N_k): 
+            for ik in range(Nk): 
                 if exit_adj[iz,ib,ik]:
                     V_new[iz, ib, ik] = 0
                     k_policy[iz, ib, ik] = 0
@@ -196,14 +196,14 @@ def bellman_invest(b_next, k_next, b, k, z, iz, psi, xi, delta, alpha, r, cf, b_
 
 @njit(parallel = True)
 def howard_step_nvfi(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid, b_grid, k_grid):
-    N_z, N_b, N_k = W.shape
-    V_new = np.zeros((N_z, N_b, N_k))
+    Nz, Nb, Nk = W.shape
+    V_new = np.zeros((Nz, Nb, Nk))
 
-    for iz in prange(N_z):
+    for iz in prange(Nz):
         z = z_grid[iz]
-        for ib in range(N_b):
+        for ib in range(Nb):
             b = b_grid[ib]
-            for ik in range(N_k):                 
+            for ik in range(Nk):                 
                 if exit_keep[iz,ib,ik]:
                     V_new[iz, ib, ik] = 0
 
@@ -213,7 +213,7 @@ def howard_step_nvfi(W, k_policy, b_policy, psi, xi, delta, alpha, cf, r, z_grid
                     b_next = b_policy[iz, ib, ik]
 
                     if k_next == (1-delta) * k:
-                        V_new[iz, ib, ik] = bellman_keep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
+                        V_new[iz, ib, ik] = bellmaNkeep(b_next, b, k, iz, r, alpha, delta, cf, z_grid, b_grid, k_grid, W)
                     else:
                         V_new[iz, ib, ik] = bellman_invest(b_next, k_next, b, k, z, iz, psi, xi, delta, alpha, r, cf, b_grid, k_grid, W)
     return V_new

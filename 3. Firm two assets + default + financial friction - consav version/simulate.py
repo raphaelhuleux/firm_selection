@@ -40,7 +40,7 @@ def simulate(k_policy, b_policy, delta, alpha, xi, cf, psi, r, P, z_grid, b_grid
     for i in range(N):
         k0 = k_grid[-1] #0.1 #np.random.uniform(k_min, k_max)
         b0 = 0
-        iz0 = 1 #np.random.choice(N_z)
+        iz0 = 1 #np.random.choice(Nz)
 
         sims[i] = _simulate(b0, k0, iz0, k_policy, b_policy, delta, alpha, xi, cf, psi, r, P, z_grid, b_grid, k_grid, T = T)
 
