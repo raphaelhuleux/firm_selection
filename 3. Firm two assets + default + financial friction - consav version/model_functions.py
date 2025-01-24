@@ -67,13 +67,13 @@ def fast_expectation(Pi, X):
     return res
 
 @nb.njit
-def debt_price_function(iz, k_next, b_next, r, exit, P, k_grid, b_grid):
+def debt_price_function(iz, k_next, b_next, r, exit_policy, P, k_grid, b_grid):
     q = 0.0
     Nz = P.shape[0]
 
     for iz_prime in range(Nz):
         Pz = P[iz,iz_prime] 
-        exit_prob = interp_2d(b_grid, k_grid, exit[iz_prime,:,:], b_next, k_next)
+        exit_prob = interp_2d(b_grid, k_grid, exit_policy[iz_prime,:,:], b_next, k_next)
         q_temp =  1/(1+r) * (1 - exit_prob)  # assuming the bank cannot recover any assets in case of default
         q += Pz * q_temp
     

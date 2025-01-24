@@ -29,6 +29,7 @@ def compute_exit_decision(par, sol):
 
     sol.exit_policy[...] = exit_policy_guess
 
+
 @nb.njit
 def compute_exit_decision_step(exit_policy, par, sol):
     """ 
@@ -46,20 +47,22 @@ def compute_exit_decision_step(exit_policy, par, sol):
             k = par.k_grid[ik]
             for ib in range(Nb):
                 b = par.b_grid[ib]
-
-                b_max = par.nu * (1-par.delta) * k
-                k_next = (1-par.delta) * par.k_grid[ik]
-
-                # Check div_policy when b_next = b_max 
-                div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, exit_policy, par)
-
-                # If b_next = b_max not feasible, check for an interior solution
-                if (div_b_max < 0):
-                    b_next = optimizer(objective_dividend_keeper, par.b_grid[0], b_max, args=(k_next, z, b, k, iz, exit_policy, par))
-                    div_max[iz,ib,ik] = -objective_dividend_keeper(b_next, k_next, z, b, k, iz, exit_policy, par)  
+                if b > par.nu * k:
+                    div_max[iz,ib,ik] = -1
                 else:
-                    b_next = b_max 
-                    div_max[iz,ib,ik] = div_b_max
+                    b_max = par.b_grid[-1] # par.nu * (1-par.delta) * k
+                    k_next = (1-par.delta) * par.k_grid[ik]
+
+                    # Check div_policy when b_next = b_max 
+                    div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, exit_policy, par)
+
+                    # If b_next = b_max not feasible, check for an interior solution
+                    if (div_b_max < 0):
+                        b_next = optimizer(objective_dividend_keeper, par.b_grid[0], b_max, args=(k_next, z, b, k, iz, exit_policy, par))
+                        div_max[iz,ib,ik] = -objective_dividend_keeper(b_next, k_next, z, b, k, iz, exit_policy, par)  
+                    else:
+                        b_next = b_max 
+                        div_max[iz,ib,ik] = div_b_max
 
     exit_policy_new = np.asarray(div_max < 0, dtype=np.float64)
     return exit_policy_new
@@ -92,7 +95,7 @@ def compute_b_min(par, sol):
         - if negative, check for an iterior solution by using a root finder (b_next such that div_policy = 0)
         - to use the bisection, we need to find an upper bound on b_next that yields positive div_policy. We check first
         b_next = nu * k_next. If this is negative, we take an interior solution using an optimizer. 
-
+    This is equivalent to solving the keeper problem!
     """
     Nz, Nb, Nk = par.Nz, par.Nb, par.Nk
     z_grid, b_grid, k_grid = par.z_grid, par.b_grid, par.k_grid
@@ -127,11 +130,11 @@ def compute_b_min(par, sol):
                 b_min_keep[iz,ib,ik] = b_min
 
 @nb.njit
-def grid_search_k_max(z, b, k, iz, sol, par, Nb_next = 100, Nk_next = 100):
+def grid_search_k_max(z, b, k, iz, sol, par, Nb_next = 200, Nk_next = 200):
 
     k_choice = np.linspace((1-par.delta)*k, par.k_grid[-1], Nk_next)
 
-    for k_next in k_choice:
+    for k_next in k_choice:    
         b_choice = np.linspace(b, par.nu * k_next, Nb_next)
         for b_next in b_choice:
             coh = z * k**par.alpha - b + (1-par.delta) * k
@@ -141,9 +144,7 @@ def grid_search_k_max(z, b, k, iz, sol, par, Nb_next = 100, Nk_next = 100):
             if div >= 0.0:
                 k_max = k_next
                 b_opt = b_next
-            if q == 0.0:
-                break 
-
+                 
     return k_max, b_opt 
 
 @nb.njit(parallel=True)
@@ -163,4 +164,5 @@ def compute_k_max(par, sol):
                 k_next, b_next = grid_search_k_max(z, b, k, iz, sol, par)
 
                 k_max_adj[iz,ib,ik] = k_next
+
 
