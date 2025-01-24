@@ -9,7 +9,7 @@ from EconModel import jit
 from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 
 # Grid search
-model_vfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', algo = {'solve': 'grid_search'})
+model_vfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', algo = {'solve': 'grid_search'}, par = {'Nz': 5, 'Nb': 300, 'Nk': 300})
 model_vfi.prepare()
 model_vfi.solve()
 
@@ -46,6 +46,7 @@ plt.plot(k_grid, b_policy[-1,0,:].T, label = 'b_policy', linestyle = ':', color 
 plt.plot(k_grid, k_policy[-1,0,:].T- (1-par.delta)*k_grid, label = 'k_policy', linestyle = ':', color = 'C1')
 plt.plot(k_grid, div_policy[-1,0,:].T, label = 'div_policy', linestyle = ':', color = 'C2')
 plt.legend()
+plt.xlabel('k')
 plt.show()
 
 # NVFI

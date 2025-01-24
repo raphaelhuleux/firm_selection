@@ -6,6 +6,13 @@ from precompute import objective_dividend_keeper
 import quantecon as qe 
 from consav.golden_section_search import optimizer 
 
+""" 
+Problem with the code: 
+when solving the adjuster problem, some intermediate values of k_next between k_min and k_max are not feasible,
+even if k_min and k_max are feasible! this means that there is some strong non-monotonicity in the problem: 
+increasing k_next might actually make you more.
+Maybe the issue is with the price function q that looks like a step function
+"""
 
 """
 VFI 
@@ -20,7 +27,6 @@ def bellman_keep(b_next, b, k, iz, W, par, sol):
     coh = k**par.alpha * par.z_grid[iz] - b 
     k_next = (1-par.delta) * k
     q = debt_price_function(iz, k_next, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
-
     div = coh + b_next * q - par.cf
 
     penalty = 0.0 
@@ -41,7 +47,6 @@ def solve_keep(W, par, sol):
     b_policy = np.zeros((Nz, Nb, Nk))
 
     for iz in prange(Nz):
-        z = par.z_grid[iz]
         for ib in range(Nb):
             b = par.b_grid[ib]
             for ik in range(Nk): 
@@ -52,8 +57,6 @@ def solve_keep(W, par, sol):
                 else:
                     k = par.k_grid[ik]
                     k_next = (1-par.delta) * k
-                    coh = z * k**par.alpha - b 
-
                     b_next =  sol.b_min_keep[iz,ib,ik]
 
                     k_policy[iz,ib,ik] = k_next
@@ -81,7 +84,7 @@ def b_next_adj(k_next, adj_cost, b, k, iz, par, sol):
     b_grid = par.b_grid
 
     div_b_min = -objective_dividend_adj(b_grid[0], k_next, adj_cost, z, b, k, iz, exit_policy, par)
-    b_max = par.nu * k_next
+    b_max = par.b_grid[-1]
 
     print(k_next)
 
@@ -113,8 +116,6 @@ def bellman_adj(k_next, b, k, iz, par, sol, W):
     penalty = 0.0
     if div < 0:
         penalty += np.abs(div*1e6)
-    if b_next > par.nu * k_next:
-        penalty += np.abs((b_next - par.nu * k_next)*1e6)
     
     V = div + interp_2d(par.b_grid, par.k_grid, W[iz], b_next, k_next)
     

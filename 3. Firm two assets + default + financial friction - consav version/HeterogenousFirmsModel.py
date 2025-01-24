@@ -90,8 +90,8 @@ class HeterogenousFirmsModelClass(EconModelClass):
             sol = model.sol
             compute_exit_decision(par, sol)
             compute_q_matrix(par, sol)
-            compute_b_min(par, sol)
-            compute_k_max(par, sol)
+            #compute_b_min(par, sol)
+            #compute_k_max(par, sol)
 
     def solve(self): # user-defined
         """ solve the model """

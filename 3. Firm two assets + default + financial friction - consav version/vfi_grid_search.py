@@ -16,8 +16,6 @@ def bellman_invest(b_next, k_next, b, k, iz, par, sol, W):
     adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
     div = coh - adj_cost - k_next + b_next * q - par.cf
 
-    if b_next > par.nu * k_next:
-        return -np.inf
     if div < 0:
         return -np.inf 
     
@@ -43,21 +41,17 @@ def bellman_inaction(b_next, b, k, iz, par, sol, W):
 
 
 @njit
-def grid_search_invest(b, k, iz, k_max, W, par, sol, Nb_choice = 60, Nk_choice = 100):
+def grid_search_invest(b, k, iz, k_max, W, par, sol, Nb_choice = 100, Nk_choice = 100):
 
     Vmax = -np.inf 
 
     k_min = (1-par.delta) * k + 1e-8
     k_choice = np.linspace(k_min, k_max, Nk_choice)
+    b_choice = np.linspace(par.b_grid[0], par.b_grid[-1], Nb_choice)
 
     for k_next in k_choice:
-        b_max = par.nu * k_next 
-        b_choice = np.linspace(par.b_grid[0], b_max, Nb_choice)
         for b_next in b_choice:
             V = bellman_invest(b_next, k_next, b, k, iz, par, sol, W)
-            q = debt_price_function(iz, k_next, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
-            if q == 0.0:
-                break
             if V > Vmax:
                 Vmax = V
                 b_opt = b_next
@@ -66,18 +60,14 @@ def grid_search_invest(b, k, iz, k_max, W, par, sol, Nb_choice = 60, Nk_choice =
     return Vmax, b_opt, k_opt
 
 @njit
-def grid_search_inaction(b, k, iz, b_min, W, par, sol, Nb_choice = 60):
+def grid_search_inaction(b, k, iz, b_min, W, par, sol, Nb_choice = 100):
 
     Vmax = -np.inf 
-    b_max = par.nu * (1-par.delta) * k
-    b_choice = np.linspace(b_min, b_max, Nb_choice)
+    b_choice = np.linspace(b_min, par.b_grid[-1], Nb_choice)
     b_opt = 0.0
     
     for b_next in b_choice:
         V = bellman_inaction(b_next, b, k, iz, par, sol, W)
-        q = debt_price_function(iz, (1-par.delta)*k, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
-        if q == 0.0:
-            break
 
         if V > Vmax:
             Vmax = V
