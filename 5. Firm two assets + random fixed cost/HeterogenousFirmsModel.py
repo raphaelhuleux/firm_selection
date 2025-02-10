@@ -3,7 +3,7 @@ import numpy as np
 import numba as nb
 import quantecon as qe
 from model_functions import * 
-from precompute import compute_exit_decision, compute_q_matrix, compute_b_min, compute_k_max, compute_exit_decision_adj, compute_b_min_interp
+from precompute import compute_exit_decision, compute_q_matrix, compute_b_min, compute_k_max, compute_exit_decision_adj
 from vfi_grid_search import solve_vfi_grid_search
 from nvfi_analytical import solve_nvfi_analytical
 from consav.quadrature import log_normal_gauss_hermite
@@ -115,7 +115,6 @@ class HeterogenousFirmsModelClass(EconModelClass):
             sol = model.sol
 
             compute_exit_decision(par, sol)
-            compute_q_matrix(par, sol)
             compute_exit_decision_adj(par, sol)
             compute_b_min(par, sol)
             compute_k_max(par, sol)
@@ -128,4 +127,4 @@ class HeterogenousFirmsModelClass(EconModelClass):
             if model.par.solve == 'grid_search':
                 solve_vfi_grid_search(par, sol)
             elif model.par.solve == 'nvfi_analytical':
-                solve_nvfi_analytical(par, sol)
+                solve_nvfi_analytical(par, sol, do_howard = par.howard)

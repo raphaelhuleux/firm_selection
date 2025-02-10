@@ -41,14 +41,10 @@ class HeterogenousFirmsModelClass(EconModelClass):
 
         # Grid
         par.Nk = 40
-        par.Nb = 50
+        par.Nb = 70
         par.Nm = 60
         par.Nz = 5
-        par.Nomega = 10
-
-        par.Nk_dense = 60
-        par.Nb_dense = 70
-        par.Nz_dense = 30
+        par.Nomega = 6
 
         par.Nk_choice = 100
         par.Nb_choice = 100
@@ -59,7 +55,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.b_min = 0
         par.b_max = min(par.nu*par.k_max, par.k_max) 
 
-        par.m_min = -3
+        par.m_min = -2
         par.m_max = 2*2*par.kbar**par.alpha + (1-par.delta) * par.kbar
 
         # Algo 
@@ -104,7 +100,6 @@ class HeterogenousFirmsModelClass(EconModelClass):
             sol = model.sol
 
             compute_exit_decision(par, sol)
-            compute_q_matrix(par, sol)
             compute_exit_decision_adj(par, sol)
 
     def solve(self): # user-defined

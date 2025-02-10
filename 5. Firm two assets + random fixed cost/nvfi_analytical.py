@@ -30,7 +30,7 @@ def bellman_keep(b_next, b, k, iz, W, par, sol):
     z = par.z_grid[iz]
     coh = k**par.alpha * z - b 
     k_next = (1-par.delta) * k
-    q = interp_3d(par.z_grid, par.b_grid, par.k_grid, sol.q, z, b_next, k_next)
+    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
     div = coh + b_next * q 
 
     penalty = 0.0 
@@ -73,36 +73,6 @@ def solve_keep(W, par, sol):
 Solve adjuster problem
 """
 
-@nb.njit
-def objective_dividend_adj(b_next, k_next, adj_cost, iz, b, k, sol, par):
-    #q = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par.P, par.k_grid, par.b_grid)
-    z = par.z_grid[iz]
-    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
-    div = z * k**par.alpha + q * b_next - b + (1-par.delta) * k - adj_cost - k_next
-    return -div
-
-
-@njit 
-def b_next_adj(k_next, adj_cost, b, k, iz, par, sol): 
-    print(k_next)
-    z = par.z_grid[iz]
-    b_grid = par.b_grid
-
-    div_b_min = -objective_dividend_adj(b_grid[0], k_next, adj_cost, iz, b, k, sol, par)
-    b_max = par.b_grid[-1]
-
-    if div_b_min < 0:
-        div_b_max = -objective_dividend_adj(b_max, k_next, adj_cost, iz, b, k, sol, par)
-        if div_b_max < 0:
-            b_max = optimizer(objective_dividend_adj, b_grid[0], b_max, args=(k_next, adj_cost, iz, b, k, sol, par))
-            div_b_max = -objective_dividend_adj(b_max, k_next, adj_cost, iz, b, k, sol, par)
-
-        res = qe.optimize.root_finding.bisect(objective_dividend_adj, b_grid[0], b_max, args=(k_next, adj_cost, iz, b, k, sol, par))
-        b_next = res.root
-    else:
-        b_next = b_grid[0]
-
-    return b_next
 
 """
 iz = 0
@@ -152,25 +122,28 @@ plt.ylabel('div')
 plt.show()
 """
 
-@njit 
-
 
 @njit 
-def bellman_adj(k_next, b, k, iz, par, sol, W):
+def bellman_adj(k_next, b, k, iz, par, sol, W, b_keep):
     z = par.z_grid[iz]
 
-    coh = z * k**par.alpha + (1-par.delta) * k - b 
-    adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
+    y = z * k**par.alpha 
+    y_new = z * (k_next / (1-par.delta))**par.alpha
 
-    b_next = b_next_adj(k_next, adj_cost, b, k, iz, par, sol)
+    adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
+    b_tilde = b + adj_cost + (y_new - y) + k_next - (1-par.delta) * k
+    b_next = interp_2d(par.b_grid, par.k_grid, b_keep[iz], b_tilde, k_next / (1-par.delta))
     q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
-    div = coh - adj_cost - k_next + b_next * q 
+
+    div = y + (1-par.delta) * k - b - k_next + b_next * q - adj_cost
 
     penalty = 0.0
     if div < 0:
         penalty += np.abs(div*1e6)
     
     V = div + interp_2d(par.b_grid, par.k_grid, W[iz], b_next, k_next)
+
+    #V = bellman_keep(b_next, b_tilde, k_next / (1-par.delta), iz, W, par, sol)
     
     return -V + penalty
 
@@ -188,8 +161,8 @@ def bellman_invest(k_next, b_next, b, k, iz, par, sol, W):
     return V 
 
 
-@njit()
-def solve_adj(W, par, sol):
+@njit
+def solve_adj(W, b_keep, par, sol):
     Nz, Nb, Nk = W.shape
 
     V_new = np.zeros((Nz, Nb, Nk))
@@ -197,6 +170,7 @@ def solve_adj(W, par, sol):
     b_policy = np.zeros((Nz, Nb, Nk))
 
     for iz in range(Nz):
+        z = par.z_grid[iz]
         for ib in range(Nb):
             b = par.b_grid[ib]
             for ik in range(Nk):
@@ -209,13 +183,17 @@ def solve_adj(W, par, sol):
                 else:
                     k_min = (1-par.delta) * k + 1e-6
                     k_max = sol.k_max_adj[iz,ib,ik]
-                    k_opt = optimizer(bellman_adj, k_min, k_max, args = (b, k, iz, par, sol, W))
+                    k_next = optimizer(bellman_adj, k_min, k_max, args = (b, k, iz, par, sol, W, b_keep))
 
-                    adj_cost = compute_adjustment_cost(k_opt, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
+                    y = z * k**par.alpha 
+                    y_new = z * (k_next / (1-par.delta))**par.alpha
+                    adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
+                    b_tilde = b + adj_cost + (y_new - y) + k_next - (1-par.delta) * k
+                    b_next = interp_2d(par.b_grid, par.k_grid, b_keep[iz], b_tilde, k_next / (1-par.delta))
 
-                    b_policy[iz,ib,ik] = b_next_adj(k_opt, adj_cost, b, k, iz, par, sol)
-                    k_policy[iz,ib,ik] = k_opt
-                    V_new[iz,ib,ik] = bellman_invest(k_opt, b_policy[iz,ib,ik], b, k, iz, par, sol, W)
+                    b_policy[iz,ib,ik] = b_next
+                    k_policy[iz,ib,ik] = k_next
+                    V_new[iz,ib,ik] = bellman_invest(k_next, b_next, b, k, iz, par, sol, W)
 
     return V_new, k_policy, b_policy
 
@@ -225,8 +203,9 @@ NVFI
 
 def nvfi_step_analytical(V, par, sol):
     W = par.beta * fast_expectation(par.P, V)
+    W = compute_expectation_omega(W, par)
     V_keep, k_keep, b_keep = solve_keep(W, par, sol)
-    V_adj, k_adj, b_adj = solve_adj(W, par, sol)
+    V_adj, k_adj, b_adj = solve_adj(W, b_keep, par, sol)
 
     k_policy = np.where(V_keep >= V_adj, k_keep, k_adj)
     b_policy = np.where(V_keep >= V_adj, b_keep, b_adj)
@@ -234,7 +213,7 @@ def nvfi_step_analytical(V, par, sol):
 
     return V_new, k_policy, b_policy
 
-def solve_nvfi_analytical(par, sol, tol = 1e-4, do_howard = True):
+def solve_nvfi_analytical(par, sol, tol = 1e-4, do_howard = False):
     error = 1
 
     V_init = np.zeros((par.Nz, par.Nb, par.Nk))
@@ -248,7 +227,7 @@ def solve_nvfi_analytical(par, sol, tol = 1e-4, do_howard = True):
             V = howard_nvfi(V, k_policy, b_policy, par, sol)
 
 
-    sol.inaction[...] = k_policy > (1-par.delta) * par.k_grid[None, None, :]
+    sol.inaction[...] = k_policy == (1-par.delta) * par.k_grid[None, None, :]
     sol.k_policy[...] = k_policy
     sol.b_policy[...] = b_policy
     sol.V[...] = V
@@ -264,7 +243,6 @@ def howard_step_nvfi(W, k_policy, b_policy, par, sol):
     V_new = np.zeros((Nz, Nb, Nk))
 
     for iz in prange(Nz):
-        z = par.z_grid[iz]
         for ib in range(Nb):
             b = par.b_grid[ib]
             for ik in range(Nk):                 
@@ -284,8 +262,9 @@ def howard_step_nvfi(W, k_policy, b_policy, par, sol):
 
 def howard_nvfi(V, k_policy, b_policy, par, sol, tol = 1e-4, iter_max = 1000):
 
-    for n in range(100):
+    for n in range(20):
         W = par.beta * fast_expectation(par.P, V)
+        W = compute_expectation_omega(W, par)
         V = howard_step_nvfi(W, k_policy, b_policy, par, sol)
 
     return V 

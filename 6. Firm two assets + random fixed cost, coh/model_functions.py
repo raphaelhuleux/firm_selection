@@ -11,7 +11,7 @@ from consav.golden_section_search import optimizer
 
 @njit 
 def compute_adjustment_cost(k_next, k, delta, psi, xi):
-    return psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k
+    return psi / 2 * (k_next - (1-delta)*k)**2 / (k+1e-5) + xi * k
 
 @njit
 def dividend_keep(b_next, k_next, exit_policy, z, b, k, iz, par):
@@ -79,3 +79,26 @@ def debt_price_function(iz, k_next, b_next, r, exit_policy, par):
             q += Pz * q_temp
 
     return q 
+
+
+@nb.njit (parallel = True)
+def compute_expectation(V, par):
+    W = np.zeros((par.Nz, par.Nb, par.Nk))
+    for iz in nb.prange(par.Nz):
+        for ik_next in range(par.Nk):
+            for ib_next in range(par.Nb):
+                V_temp = 0
+                for iz_next in range(par.Nz):
+                    temp = np.zeros_like(par.omega_grid)
+                    P = par.P[iz,iz_next] * par.omega_p
+                    k_next = par.k_grid[ik_next] * np.ones_like(par.omega_grid)
+                    b_next = par.b_grid[ib_next]
+                    z_next = par.z_grid[iz_next]
+                    omega = par.omega_grid
+                    m_next = z_next * k_next**par.alpha + (1-par.delta) * k_next - b_next - omega 
+                    interp_2d_vec(par.m_grid, par.k_grid, V[iz_next], m_next, k_next, temp)
+                    V_temp += np.sum(P * temp)
+
+                W[iz,ib_next,ik_next] = V_temp
+
+    return W

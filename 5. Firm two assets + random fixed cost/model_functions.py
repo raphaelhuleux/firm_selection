@@ -3,35 +3,34 @@ import numpy as np
 import numba as nb 
 import matplotlib.pyplot as plt
 import quantecon as qe 
+from consav.linear_interp_1d import interp_1d
 from consav.linear_interp_2d import interp_2d, interp_2d_vec
 from numba import njit, prange
 import quantecon as qe 
 from consav.golden_section_search import optimizer 
 
 
-@njit 
+@nb.njit 
 def compute_adjustment_cost(k_next, k, delta, psi, xi):
     return psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k
 
-@njit
-def dividend_keep(b_next, k_next, exit_policy, z, b, k, iz, par):
-    q = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par.P, par.k_grid, par.b_grid)
-    div = z * k**par.alpha + q * b_next - b - par.cf  
+
+@nb.njit
+def dividend_fun(b_next, k_next, z, b, k, iz, sol, par):
+    if k_next == (1-par.delta) * k:
+        adj_cost = 0
+    else:
+        adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi)
+    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
+    div = z * k**par.alpha + q * b_next - b + (1-par.delta) * k - k_next - adj_cost
     return div
 
-@njit
-def dividend_adj(b_next, k_next, exit_policy, z, b, k, iz, par):
-    adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi)
-    q = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par.P, par.k_grid, par.b_grid)
-    div = z * k**par.alpha + q * b_next - b + (1-par.delta) * k - k_next - adj_cost - par.cf  
-    return div
-
-@njit 
+@nb.njit 
 def compute_optimal_div_policy(b_policy, k_policy, par, sol):
     Nz, Nb, Nk = par.Nz, par.Nb, par.Nk
     z_grid, b_grid, k_grid = par.z_grid, par.b_grid, par.k_grid
 
-    div_policy_max = sol.div_policy 
+    div_policy = sol.div_policy 
 
     for iz in range(Nz):
         z = z_grid[iz]
@@ -41,18 +40,15 @@ def compute_optimal_div_policy(b_policy, k_policy, par, sol):
                 b = b_grid[ib] 
 
                 if sol.exit_policy[iz,ib,ik] == 1:
-                    div_policy_max[iz,ib,ik] = -np.inf
+                    div_policy[iz,ib,ik] = -np.inf
 
                 else:
                     b_next = b_policy[iz,ib,ik]
                     k_next = k_policy[iz,ib,ik]
-                    if k_next == (1-par.delta) * k:
-                        div_policy_max[iz,ib,ik] = dividend_keep(b_next, k_next, sol.exit_policy, z, b, k, iz, par)
-                    else: 
-                        div_policy_max[iz,ib,ik] = dividend_adj(b_next, k_next, sol.exit_policy, z, b, k, iz, par)
+                    div_policy[iz,ib,ik] = dividend_fun(b_next, k_next, z, b, k, iz, sol, par)
 
 
-@njit
+@nb.njit
 def fast_expectation(Pi, X):
     
     res = np.zeros_like(X)
@@ -65,6 +61,24 @@ def fast_expectation(Pi, X):
                     res[i,j,k] += Pi[i,l] * X[l,j,k]
                             
     return res
+
+@nb.njit 
+def compute_expectation_omega(V, par):
+
+    W = np.zeros((par.Nz, par.Nb, par.Nk))
+
+    V_temp = 0.0
+
+    for iz in range(par.Nz):
+        for ik in range(par.Nk):
+            for ib in range(par.Nb):
+                V_temp = 0.0
+                for i_omega in range(par.Nomega):
+                    b_tilde = par.b_grid[ib] + par.omega_grid[i_omega]
+                    V_temp += par.omega_p[i_omega] * interp_1d(par.b_grid, V[iz,:,ik], b_tilde)
+                W[iz,ib,ik] = V_temp
+
+    return W
 
 @nb.njit
 def debt_price_function(iz, k_next, b_next, r, exit_policy, par):

@@ -8,34 +8,13 @@ import quantecon as qe
 from EconModel import jit
 from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 
-""" 
-with jit(model_vfi) as model:
-    par = model.par
-    sol = model.sol
-
-Z_grid, K_grid, B_grid = np.meshgrid(par.z_grid, par.k_grid, par.b_grid, indexing = 'ij')
-
-Z_flat = Z_grid.ravel()
-K_flat = K_grid.ravel()
-B_flat = B_grid.ravel()
-q_flat = sol.q.ravel()
-
-from scipy.interpolate import Rbf
-rbf = Rbf(Z_flat, K_flat, B_flat, q_flat, function="multiquadric", smooth=0.1)
-Z_smooth = rbf(Z_grid, K_grid, B_grid)
-
-
-plt.plot(model_vfi.sol.q[0,1,:])
-plt.plot(Z_smooth[1,:,10])
-"""
-
 # Grid search
 #model_vfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve': 'grid_search', 'Nz': 3})
 #model_vfi.prepare()
 #model_vfi.solve()
 
 # NVFI 
-model_nvfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'Nz': 7, 'Nomega':10, 'omega_sigma':3, 'solve': 'nvfi_analytical'})   
+model_nvfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'Nz': 7, 'Nomega':10, 'omega_sigma':0.5, 'solve': 'nvfi_analytical'})   
 model_nvfi.prepare()
 plt.plot(model_nvfi.par.b_grid, model_nvfi.sol.q[0,:,5])
 model_nvfi.solve()

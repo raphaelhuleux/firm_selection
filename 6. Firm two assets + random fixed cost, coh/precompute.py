@@ -41,22 +41,24 @@ def compute_exit_decision(par, sol):
     Iteratively update the exit decision function until convergence
     """
 
-    exit_policy_guess = np.zeros((par.Nz,par.Nm,par.Nk))
+    exit_policy = np.ones((par.Nz,par.Nm,par.Nk))
 
     error = 1 
-    tol = 1e-4
+    tol = 5e-4
     while error > tol:
-        exit_policy_new = compute_exit_decision_step(exit_policy_guess, par)
-        error = np.mean(np.abs(exit_policy_new - exit_policy_guess))
+        compute_q_matrix(exit_policy, par, sol)
+        exit_policy_new = compute_exit_decision_step(sol, par)
+        error = np.mean(np.abs(exit_policy_new - exit_policy))
         print(error)
-        exit_policy_guess = exit_policy_new
+        exit_policy = exit_policy_new
 
-    exit_policy_guess[:,:,0] = 1
-    sol.exit_policy[...] = exit_policy_guess
+    sol.exit_policy[...] = exit_policy
+    compute_q_matrix(sol.exit_policy, par, sol)
+
 
 
 @nb.njit(parallel=True)
-def compute_exit_decision_step(exit_policy, par):
+def compute_exit_decision_step(sol, par):
     """ 
     For a guess on the exit decision function, update the exit decision function by 
         - check if setting b_next = b_max yields positive profits
@@ -65,7 +67,6 @@ def compute_exit_decision_step(exit_policy, par):
     """
 
     Nz, Nm, Nk = par.Nz, par.Nm, par.Nk
-    z_grid = par.z_grid
     k_grid = par.k_grid
     m_grid = par.m_grid
     b_grid = par.b_grid
@@ -73,7 +74,6 @@ def compute_exit_decision_step(exit_policy, par):
     div_max = np.zeros((Nz, Nm, Nk))
 
     for iz in prange(Nz):
-        z = z_grid[iz]
         for ik in range(Nk):
             k = k_grid[ik]
             for im in range(Nm):
@@ -81,12 +81,12 @@ def compute_exit_decision_step(exit_policy, par):
                 b_max = b_grid[-1] # par.nu * (1-par.delta) * k
 
                 # Check div_policy when b_next = b_max 
-                div_b_max = -objective_dividend_keeper(b_max, m, k, iz, exit_policy, par)
+                div_b_max = -objective_dividend_keeper(b_max, m, k, iz, sol, par)
 
                 # If b_next = b_max not feasible, check for an interior solution
                 if (div_b_max < 0):
-                    b_next = optimizer(objective_dividend_keeper, b_grid[0], b_max, args=(m, k, iz, exit_policy, par))
-                    div_max[iz,im,ik] = -objective_dividend_keeper(b_next, m, k, iz, exit_policy, par)  
+                    b_next = optimizer(objective_dividend_keeper, b_grid[0], b_max, args=(m, k, iz, sol, par))
+                    div_max[iz,im,ik] = -objective_dividend_keeper(b_next, m, k, iz, sol, par)  
                 else:
                     b_next = b_max 
                     div_max[iz,im,ik] = div_b_max
@@ -95,35 +95,30 @@ def compute_exit_decision_step(exit_policy, par):
     return exit_policy_new
 
 @nb.njit
-def objective_dividend_keeper(b_next, m, k, iz, exit_policy, par):
+def objective_dividend_keeper(b_next, m, k, iz, sol, par):
     k_next = (1-par.delta) * k
-    q = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par)
+    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
     div = m - k_next + q * b_next
     return -div
 
 @nb.njit 
 def objective_dividend_adj(b_next, iz, m, k, sol, par):
-    z = par.z_grid[iz]
     k_next = (1-par.delta) * k + 1e-6 
     adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi)
     q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
     div = m - adj_cost - k_next + q * b_next
     return -div
 
-
 @nb.njit
-def compute_q_matrix(par, sol):
+def compute_q_matrix(exit_policy, par, sol):
     """ 
     Given an exit decision function, compute the price of debt for all choices of k_next, b_next, z 
     """
     q_mat = sol.q 
 
     Nz, Nb, Nk = par.Nz, par.Nb, par.Nk
-    P = par.P
-    z_grid = par.z_grid
     k_grid = par.k_grid
     b_grid = par.b_grid
-    exit_policy = sol.exit_policy
 
     for iz in range(Nz):
         for ik in range(Nk):

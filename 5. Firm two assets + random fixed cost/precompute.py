@@ -35,28 +35,28 @@ def compute_exit_decision_adj(par, sol):
                         sol.exit_policy_adj[iz,ib,ik] = 1
 
 
-@nb.njit
 def compute_exit_decision(par, sol):
     """ 
     Iteratively update the exit decision function until convergence
     """
 
-    exit_policy_guess = np.zeros((par.Nz,par.Nb,par.Nk))
+    exit_policy = np.ones((par.Nz,par.Nb,par.Nk))
 
     error = 1 
-    tol = 1e-4
+    tol = 5e-4
     while error > tol:
-        exit_policy_new = compute_exit_decision_step(exit_policy_guess, par)
-        error = np.mean(np.abs(exit_policy_new - exit_policy_guess))
+        compute_q_matrix(exit_policy, par, sol)
+        exit_policy_new = compute_exit_decision_step(sol, par)
+        error = np.mean(np.abs(exit_policy_new - exit_policy))
         print(error)
-        exit_policy_guess = exit_policy_new
+        exit_policy = exit_policy_new
+    exit_policy[:,:,0] = 1
 
-    exit_policy_guess[:,:,0] = 1
-    sol.exit_policy[...] = exit_policy_guess
+    sol.exit_policy[...] = exit_policy
 
 
 @nb.njit(parallel=True)
-def compute_exit_decision_step(exit_policy, par):
+def compute_exit_decision_step(sol, par):
     """ 
     For a guess on the exit decision function, update the exit decision function by 
         - check if setting b_next = b_max yields positive profits
@@ -81,12 +81,12 @@ def compute_exit_decision_step(exit_policy, par):
                 k_next = (1-par.delta) * k_grid[ik]
 
                 # Check div_policy when b_next = b_max 
-                div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, exit_policy, par)
+                div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, sol, par)
 
                 # If b_next = b_max not feasible, check for an interior solution
                 if (div_b_max < 0):
-                    b_next = optimizer(objective_dividend_keeper, b_grid[0], b_max, args=(k_next, z, b, k, iz, exit_policy, par))
-                    div_max[iz,ib,ik] = -objective_dividend_keeper(b_next, k_next, z, b, k, iz, exit_policy, par)  
+                    b_next = optimizer(objective_dividend_keeper, b_grid[0], b_max, args=(k_next, z, b, k, iz, sol, par))
+                    div_max[iz,ib,ik] = -objective_dividend_keeper(b_next, k_next, z, b, k, iz, sol, par)  
                 else:
                     b_next = b_max 
                     div_max[iz,ib,ik] = div_b_max
@@ -104,26 +104,23 @@ def objective_dividend_adj(b_next, iz, b, k, sol, par):
     return -div
 
 @nb.njit
-def objective_dividend_keeper(b_next, k_next, z, b, k, iz, exit_policy, par):
+def objective_dividend_keeper(b_next, k_next, z, b, k, iz, sol, par):
 
-    q = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par)
+    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
     div = z * k**par.alpha + q * b_next - b
     return -div
 
 
 @nb.njit
-def compute_q_matrix(par, sol):
+def compute_q_matrix(exit_policy, par, sol):
     """ 
     Given an exit decision function, compute the price of debt for all choices of k_next, b_next, z 
     """
     q_mat = sol.q 
 
     Nz, Nb, Nk = par.Nz, par.Nb, par.Nk
-    P = par.P
-    z_grid = par.z_grid
     k_grid = par.k_grid
     b_grid = par.b_grid
-    exit_policy = sol.exit_policy
 
     for iz in range(Nz):
         for ik in range(Nk):
@@ -131,52 +128,6 @@ def compute_q_matrix(par, sol):
                 k_next = k_grid[ik]
                 b_next = b_grid[ib]
                 q_mat[iz,ib,ik] = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par)
-
-@nb.njit
-def objective_b_min_interp(b_next, z, b, k, par, sol):
-    k_next = (1-par.delta) * k
-    q = interp_3d(par.z_grid_dense, par.b_grid_dense, par.k_grid_dense, sol.q, z, b_next, k_next)
-    div = z * k**par.alpha + q * b_next - b 
-    return -div
-
-
-@nb.njit 
-def compute_b_min_interp(par, sol):
-    
-    Nz, Nb, Nk = par.Nz, par.Nb, par.Nk
-    z_grid, b_grid, k_grid = par.z_grid, par.b_grid, par.k_grid
-    exit_policy = sol.exit_policy 
-    delta = par.delta
-
-    b_min_keep = sol.b_min_keep  
-
-    for iz in range(Nz):
-        z = z_grid[iz]
-        for ik in range(Nk):
-            k = k_grid[ik]
-            for ib in range(Nb):
-                b = b_grid[ib] 
-                b_max = par.b_grid[-1]
-
-                if exit_policy[iz,ib,ik] == 1:
-                    continue
-
-                div_b_min = -objective_b_min_interp(b_grid[0], z, b, k, par, sol)
-                
-                if div_b_min < 0:
-                    div_b_max = -objective_b_min_interp(b_max, z, b, k, par, sol)
-                    if div_b_max < 0:
-                        b_max = optimizer(objective_b_min_interp, b_grid[0], b_max, args=(z, b, k, par, sol))
-                        div_b_max = -objective_b_min_interp(b_max, z, b, k, par, sol)
-
-                    res = qe.optimize.root_finding.bisect(objective_b_min_interp, b_grid[0], b_max, args=(z, b, k, par, sol))
-                    b_min = res.root
-                    div_b_min = -objective_b_min_interp(b_min, z, b, k, par, sol)
-                else:
-                    b_min = b_grid[0]
-                    
-                b_min_keep[iz,ib,ik] = b_min
-
 
 @nb.njit 
 def compute_b_min(par, sol):
@@ -207,17 +158,17 @@ def compute_b_min(par, sol):
                 if exit_policy[iz,ib,ik] == 1:
                     continue
 
-                div_b_min = -objective_dividend_keeper(b_grid[0], k_next, z, b, k, iz, exit_policy, par)
+                div_b_min = -objective_dividend_keeper(b_grid[0], k_next, z, b, k, iz, sol, par)
                 
                 if div_b_min < 0:
-                    div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, exit_policy, par)
+                    div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, sol, par)
                     if div_b_max < 0:
-                        b_max = optimizer(objective_dividend_keeper, b_grid[0], b_max, args=(k_next, z, b, k, iz, exit_policy, par))
-                        div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, exit_policy, par)
+                        b_max = optimizer(objective_dividend_keeper, b_grid[0], b_max, args=(k_next, z, b, k, iz, sol, par))
+                        div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, sol, par)
 
-                    res = qe.optimize.root_finding.bisect(objective_dividend_keeper, b_grid[0], b_max, args=(k_next, z, b, k, iz, exit_policy, par))
+                    res = qe.optimize.root_finding.bisect(objective_dividend_keeper, b_grid[0], b_max, args=(k_next, z, b, k, iz, sol, par))
                     b_min = res.root
-                    div_b_min = -objective_dividend_keeper(b_min, k_next, z, b, k, iz, exit_policy, par)
+                    div_b_min = -objective_dividend_keeper(b_min, k_next, z, b, k, iz, sol, par)
                 else:
                     b_min = b_grid[0]
                     
