@@ -40,14 +40,10 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.kbar = (par.alpha * par.z_bar /(1/par.beta-1+par.delta))**(1/(1-par.alpha))
 
         # Grid
-        par.Nk = 40
-        par.Nb = 50
-        par.Nz = 3
-        par.Nomega = 15
-
-        par.Nk_dense = 60
-        par.Nb_dense = 70
-        par.Nz_dense = 30
+        par.Nk = 60
+        par.Nb = 70
+        par.Nz = 5
+        par.Nomega = 6
 
         par.Nk_choice = 100
         par.Nb_choice = 100
@@ -78,20 +74,10 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.z_grid = par.z_bar * np.exp(shock.state_values)
         
         par.omega_grid, par.omega_p = log_normal_gauss_hermite(par.omega_sigma, n=par.Nomega,mu=par.cf)
-        
-        # Dense grid
-        par.k_grid_dense = np.linspace(par.k_min,par.k_max,par.Nk_dense)
-        par.b_grid_dense = np.linspace(par.b_min,par.b_max,par.Nb_dense)
-        
-        shock = qe.rouwenhorst(par.Nz_dense, par.rho, par.sigma_z)
-        par.P_dense = shock.P
-        par.z_grid_dense = par.z_bar * np.exp(shock.state_values)
-
+                
         # Create solution arrays
         sol.exit_policy = np.zeros((par.Nz, par.Nb, par.Nk))
         sol.exit_policy_adj = np.zeros((par.Nz, par.Nb, par.Nk))
-
-        sol.exit_policy_dense = np.zeros((par.Nz_dense, par.Nb_dense, par.Nk_dense))
 
         sol.q = np.zeros((par.Nz, par.Nb, par.Nk))
 

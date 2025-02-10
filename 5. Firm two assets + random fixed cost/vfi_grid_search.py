@@ -12,9 +12,9 @@ def bellman_invest(b_next, k_next, b, k, iz, par, sol, W):
     z = par.z_grid[iz]
 
     coh = z * k**par.alpha + (1-par.delta) * k - b 
-    q = debt_price_function(iz, k_next, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
+    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
     adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
-    div = coh - adj_cost - k_next + b_next * q - par.cf
+    div = coh - adj_cost - k_next + b_next * q 
 
     if div < 0:
         return -np.inf 
@@ -29,8 +29,8 @@ def bellman_inaction(b_next, b, k, iz, par, sol, W):
     k_next = (1-par.delta) * k
 
     coh = z * k**par.alpha - b
-    q = debt_price_function(iz, k_next, b_next, par.r, sol.exit_policy, par.P, par.k_grid, par.b_grid)
-    div = coh + q * b_next - par.cf
+    q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
+    div = coh + q * b_next 
 
     if div < 0:
         return -np.inf 
@@ -85,6 +85,7 @@ def vfi_step(V, par, sol):
     Nz, Nb, Nk = V.shape
 
     W = par.beta * fast_expectation(par.P, V)
+    W = compute_expectation_omega(W, par)
 
     for iz in prange(Nz):
         for ik in range(Nk):
@@ -129,7 +130,7 @@ def solve_vfi_grid_search(par, sol, tol = 1e-4, do_howard = True):
         if do_howard:
             V = howard(V, k_policy, b_policy, par, sol)
 
-    sol.inaction[...] = k_policy > (1-par.delta) * par.k_grid[None, None, :]
+    sol.inaction[...] = k_policy == (1-par.delta) * par.k_grid[None, None, :]
     sol.k_policy[...] = k_policy
     sol.b_policy[...] = b_policy
     sol.V[...] = V
@@ -164,6 +165,7 @@ def howard(V, k_policy, b_policy, par, sol):
 
     for n in range(50):
         W = par.beta * fast_expectation(par.P, V)
+        W = compute_expectation_omega(W, par)
         V = howard_step(W, k_policy, b_policy, par, sol)
 
     return V

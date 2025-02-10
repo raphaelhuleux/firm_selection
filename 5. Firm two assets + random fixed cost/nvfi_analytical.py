@@ -2,7 +2,7 @@ import numpy as np
 from consav.linear_interp_2d import interp_2d
 from consav.linear_interp_3d import interp_3d
 
-import numba as nb
+from numba import njit, prange
 from model_functions import * 
 from precompute import objective_dividend_keeper
 import quantecon as qe 
@@ -74,55 +74,6 @@ Solve adjuster problem
 """
 
 
-"""
-iz = 0
-ib = 33 
-ik = 10 
-b = par.b_grid[ib]
-k = par.k_grid[ik]
-
-k_min = (1-par.delta) * k + 1e-6
-k_max = sol.k_max_adj[iz,ib,ik]
-
-N_k_choice = 1_001
-N_b_choice = 1_000
-k_choice = np.linspace(k_min, k_max, N_k_choice)
-b_choice = np.linspace(0, par.b_grid[-1], N_b_choice)
-
-z = par.z_grid[iz]
-
-coh = z * k**par.alpha + (1-par.delta) * k - b 
-
-q_vec = np.zeros((N_k_choice,  N_b_choice))
-div_vec = np.zeros((N_k_choice, N_b_choice)) 
-
-for i, k_next in enumerate(k_choice):
-    adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
-
-    for j, b_next in enumerate(b_choice):
-        q_vec[i,j] = interp_3d(par.z_grid, par.b_grid, par.k_grid, sol.q, z, b_next, k_next)
-        #q_vec[i,j] = debt_price_function(iz, k_next, b_next, par.r, sol.exit_policy, par)
-        div_vec[i,j] = z * k**par.alpha + q_vec[i,j] * b_next - b  + (1-par.delta) * k - adj_cost - k_next
-
-
-plt.plot(k_choice, np.max(div_vec, axis = 1))
-plt.xlabel('k_next')
-plt.ylabel('div')
-plt.show()
-
-plt.plot(b_choice,q_vec[[0,100,200,300,400,500,600,700,800,900,999],:].T)
-plt.xlabel('b_next')
-plt.ylabel('q')
-plt.show()
-
-
-plt.plot(b_choice,div_vec[[0,100,200,300,400,500,600,700,800,900,999],:].T)
-plt.xlabel('b_next')
-plt.ylabel('div')
-plt.show()
-"""
-
-
 @njit 
 def bellman_adj(k_next, b, k, iz, par, sol, W, b_keep):
     z = par.z_grid[iz]
@@ -161,7 +112,7 @@ def bellman_invest(k_next, b_next, b, k, iz, par, sol, W):
     return V 
 
 
-@njit
+@njit(parallel = True)
 def solve_adj(W, b_keep, par, sol):
     Nz, Nb, Nk = W.shape
 
@@ -169,7 +120,7 @@ def solve_adj(W, b_keep, par, sol):
     k_policy = np.zeros((Nz, Nb, Nk))
     b_policy = np.zeros((Nz, Nb, Nk))
 
-    for iz in range(Nz):
+    for iz in prange(Nz):
         z = par.z_grid[iz]
         for ib in range(Nb):
             b = par.b_grid[ib]

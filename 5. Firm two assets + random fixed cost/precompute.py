@@ -1,11 +1,7 @@
 import numpy as np 
-import numba as nb 
-import matplotlib.pyplot as plt
 import quantecon as qe 
 from consav.linear_interp_2d import interp_2d
-from consav.linear_interp_3d import interp_3d
 from numba import njit, prange
-import quantecon as qe 
 from consav.golden_section_search import optimizer 
 from model_functions import * 
 
@@ -13,11 +9,11 @@ from model_functions import *
 Compute exit decision
 """
 
-@nb.njit 
+@njit 
 def compute_exit_decision_adj(par, sol):
     b_grid = par.b_grid
 
-    for iz in range(par.Nz):
+    for iz in prange(par.Nz):
         for ik in range(par.Nk):
             for ib in range(par.Nb):
                 if sol.exit_policy[iz,ib,ik] == 1:
@@ -55,7 +51,7 @@ def compute_exit_decision(par, sol):
     sol.exit_policy[...] = exit_policy
 
 
-@nb.njit(parallel=True)
+@njit(parallel=True)
 def compute_exit_decision_step(sol, par):
     """ 
     For a guess on the exit decision function, update the exit decision function by 
@@ -94,7 +90,7 @@ def compute_exit_decision_step(sol, par):
     exit_policy_new = np.asarray(div_max <= 0, dtype=np.float64)
     return exit_policy_new
 
-@nb.njit 
+@njit 
 def objective_dividend_adj(b_next, iz, b, k, sol, par):
     z = par.z_grid[iz]
     k_next = (1-par.delta) * k + 1e-6 
@@ -103,7 +99,7 @@ def objective_dividend_adj(b_next, iz, b, k, sol, par):
     div = z * k**par.alpha + q * b_next - b + (1-par.delta) * k - adj_cost - k_next
     return -div
 
-@nb.njit
+@njit
 def objective_dividend_keeper(b_next, k_next, z, b, k, iz, sol, par):
 
     q = interp_2d(par.b_grid, par.k_grid, sol.q[iz], b_next, k_next)
@@ -111,7 +107,7 @@ def objective_dividend_keeper(b_next, k_next, z, b, k, iz, sol, par):
     return -div
 
 
-@nb.njit
+@njit(parallel=True)
 def compute_q_matrix(exit_policy, par, sol):
     """ 
     Given an exit decision function, compute the price of debt for all choices of k_next, b_next, z 
@@ -122,14 +118,14 @@ def compute_q_matrix(exit_policy, par, sol):
     k_grid = par.k_grid
     b_grid = par.b_grid
 
-    for iz in range(Nz):
+    for iz in prange(Nz):
         for ik in range(Nk):
             for ib in range(Nb):
                 k_next = k_grid[ik]
                 b_next = b_grid[ib]
                 q_mat[iz,ib,ik] = debt_price_function(iz, k_next, b_next, par.r, exit_policy, par)
 
-@nb.njit 
+@njit(parallel = True)
 def compute_b_min(par, sol):
     """ 
     Compute the minimum level of b_next that yields positive div_policy:
@@ -146,7 +142,7 @@ def compute_b_min(par, sol):
 
     b_min_keep = sol.b_min_keep  
 
-    for iz in range(Nz):
+    for iz in prange(Nz):
         z = z_grid[iz]
         for ik in range(Nk):
             k = k_grid[ik]
@@ -174,7 +170,7 @@ def compute_b_min(par, sol):
                     
                 b_min_keep[iz,ib,ik] = b_min
 
-@nb.njit
+@njit
 def grid_search_k_max(z, b, k, iz, sol, par, Nb_next = 80, Nk_next = 80):
 
     k_choice = np.linspace((1-par.delta)*k, par.k_grid[-1], Nk_next)
@@ -194,12 +190,12 @@ def grid_search_k_max(z, b, k, iz, sol, par, Nb_next = 80, Nk_next = 80):
                  
     return k_max, b_opt 
 
-@nb.njit(parallel=True)
+@njit(parallel=True)
 def compute_k_max(par, sol):
 
     k_max_adj = sol.k_max_adj
 
-    for iz in nb.prange(par.Nz):
+    for iz in prange(par.Nz):
         z = par.z_grid[iz]
         for ik in range(par.Nk):
             k = par.k_grid[ik]
