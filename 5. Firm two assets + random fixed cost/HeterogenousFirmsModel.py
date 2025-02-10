@@ -7,6 +7,7 @@ from precompute import compute_exit_decision, compute_q_matrix, compute_b_min, c
 from vfi_grid_search import solve_vfi_grid_search
 from nvfi_analytical import solve_nvfi_analytical
 from consav.quadrature import log_normal_gauss_hermite
+from consav.grids import nonlinspace # grids
 
 class HeterogenousFirmsModelClass(EconModelClass):
     
@@ -40,10 +41,10 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.kbar = (par.alpha * par.z_bar /(1/par.beta-1+par.delta))**(1/(1-par.alpha))
 
         # Grid
-        par.Nk = 60
+        par.Nk = 80
         par.Nb = 70
-        par.Nz = 5
-        par.Nomega = 6
+        par.Nz = 6
+        par.Nomega = 7
 
         par.Nk_choice = 100
         par.Nb_choice = 100
@@ -66,8 +67,11 @@ class HeterogenousFirmsModelClass(EconModelClass):
         sol = self.sol
 
         # Create grids
-        par.k_grid = np.linspace(par.k_min,par.k_max,par.Nk)
-        par.b_grid = np.linspace(par.b_min,par.b_max,par.Nb)
+        par.k_grid =  nonlinspace(par.k_min,par.k_max,par.Nk,1.1)
+        par.b_grid =  nonlinspace(par.b_min,par.b_max,par.Nb,1.1)
+
+        #par.k_grid = np.linspace(par.k_min,par.k_max,par.Nk)
+        #par.b_grid = np.linspace(par.b_min,par.b_max,par.Nb)
 
         shock = qe.rouwenhorst(par.Nz, par.rho, par.sigma_z)
         par.P = shock.P
