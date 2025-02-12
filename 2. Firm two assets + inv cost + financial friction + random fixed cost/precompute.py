@@ -9,8 +9,7 @@ from model_functions import *
 Compute exit decision
 """
 
-
-@njit 
+@njit
 def compute_exit_decision_adj(q, exit_policy, par):
     b_grid = par.b_grid
 
@@ -42,25 +41,25 @@ def compute_exit_decision_trans(r_trans, ss, par):
     exit_policy_adj_trans = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
 
     for t in range(par.T-1, -1, -1):
+        print(t)
         if t == par.T-1:
             q_trans[t] = compute_q_matrix(ss.exit_policy, ss.r, par)
+            exit_policy_trans[t] = compute_exit_decision_trans_step(ss.exit_policy, q_trans[t], par)
+
         else:
             q_trans[t] = compute_q_matrix(exit_policy_trans[t+1], r_trans[t+1], par)
-        exit_policy_trans[t] = compute_exit_decision_trans(q_trans[t], par)
+            exit_policy_trans[t] = compute_exit_decision_trans_step(exit_policy_trans[t+1], q_trans[t], par)
         exit_policy_adj_trans[t] = compute_exit_decision_adj(q_trans[t], exit_policy_trans[t], par)
 
     return exit_policy_trans, exit_policy_adj_trans, q_trans
 
-
-def compute_exit_decision_trans(q, par):
-    exit_policy = np.ones((par.Nz,par.Nb,par.Nk))
+@njit
+def compute_exit_decision_trans_step(exit_policy, q, par, tol = 5e-4):
 
     error = 1 
-    tol = 5e-4
     while error > tol:
         exit_policy_new = compute_exit_decision_step(q, par)
         error = np.sum(np.abs(exit_policy_new - exit_policy))
-        print(error)
         exit_policy = exit_policy_new
     exit_policy[:,:,0] = 1
 
@@ -229,18 +228,20 @@ def grid_search_k_max(z, b, k, iz, q_mat, par, Nb_next = 80, Nk_next = 80):
 def compute_k_max(q_mat, exit_policy, par):
 
     k_max_adj = np.zeros((par.Nz, par.Nb, par.Nk))
+
+
     for iz in prange(par.Nz):
         z = par.z_grid[iz]
         for ik in range(par.Nk):
             k = par.k_grid[ik]
             for ib in range(par.Nb):
                 b = par.b_grid[ib] 
-                if exit_policy[iz,ib,ik] == 1:
-                    continue
-                k_next, _ = grid_search_k_max(z, b, k, iz, q_mat, par)
+                #if exit_policy[iz,ib,ik] == 1:
+                #    continue
+                #k_next, _ = grid_search_k_max(z, b, k, iz, q_mat, par)
 
-                k_max_adj[iz,ib,ik] = k_next
-
+                k_max_adj[iz,ib,ik] = par.k_grid[-1]
+    
     return k_max_adj
 
 

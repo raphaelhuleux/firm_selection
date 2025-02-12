@@ -21,6 +21,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         """ set free parameters """
         
         par = self.par
+        trans = self.trans
 
         # Parameters
         par.alpha = 1/3 # capital share
@@ -42,6 +43,12 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.kbar = (par.alpha * par.z_bar /(1/par.beta-1+par.delta))**(1/(1-par.alpha))
 
         par.T = 100 
+
+        # r shock 
+        par.rho_r = 0.4 
+        par.sigma_r = 0.0025
+        trans.r = par.r + par.sigma_r * par.rho_r **(np.arange(par.T))
+
         # Grid
         par.Nk = 80
         par.Nb = 70
@@ -68,6 +75,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         
         par = self.par
         ss = self.ss
+        trans = self.trans 
 
         ss.r = par.r
         # Create grids
@@ -103,6 +111,16 @@ class HeterogenousFirmsModelClass(EconModelClass):
         ss.V = np.zeros((par.Nz, par.Nb, par.Nk))
 
         ss.D = np.zeros((par.Nz, par.Nb, par.Nk))
+
+        # Trans
+        trans.q = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.exit_policy = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.exit_policy_adj = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.b_policy = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.k_policy = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.V = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.D = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+
     
     def prepare(self): # required
         """ precompute specific arrays before ssving the model"""
@@ -125,15 +143,15 @@ class HeterogenousFirmsModelClass(EconModelClass):
             elif model.par.solve == 'nvfi':
                 solve_nvfi_ss(ss, par)
 
-            ss.D[...] = distribution_ss(par, ss)
+            distribution_ss(par, ss)
 
     def solve_transition(self):
         with jit(self) as model:
             par = model.par
             ss = model.ss
-            trans = model.ss 
+            trans = model.trans
 
-            trans.exit_policy[...], trans.exit_policy_adj_trans[...], trans.q[...] = compute_exit_decision_trans(trans.r, ss, par)
+            trans.exit_policy[...], trans.exit_policy_adj[...], trans.q[...] = compute_exit_decision_trans(trans.r, ss, par)
             solve_problem_firm_trans(trans, ss, par)
-            ss.D[...] = distribution_trans(trans, ss, par)
+            distribution_trans(trans, ss, par)
             

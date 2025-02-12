@@ -14,10 +14,18 @@ model_analytical = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', pa
 
 model_analytical.prepare()
 model_analytical.solve_steady_state()
+model_analytical.solve_transition()
 
 with jit(model_analytical) as model:
     par = model.par
     ss = model.ss
+    trans = model.trans
+
+ss_K = np.sum(ss.D * ss.k_policy)
+K = np.sum(trans.D * trans.k_policy, axis = (1,2,3))
+q = np.sum(trans.D[1:] * trans.q[:-1], axis = (1,2,3))
+plt.plot(K[1:])
+plt.plot(q)
 
 plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)))
 plt.xlabel('b')
@@ -35,7 +43,6 @@ model_optimizer = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par
 model_optimizer.prepare()
 model_optimizer.solve_firm_problem()
 model_optimizer.compute_steady_state_distribution()
-
 with jit(model_optimizer) as model:
     par = model.par
     sol = model.sol

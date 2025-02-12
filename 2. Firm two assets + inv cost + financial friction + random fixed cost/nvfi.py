@@ -70,7 +70,7 @@ def solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par):
     return V_new, k_policy, b_policy
 
 @njit(parallel = True)
-def solve_keep(W, exit_policy, q_mat, b_min_keep, par):
+def solve_keep(W, exit_policy, q_mat, par):
 
     Nz, Nb, Nk = W.shape
 
@@ -89,7 +89,7 @@ def solve_keep(W, exit_policy, q_mat, b_min_keep, par):
                 else:
                     k = par.k_grid[ik]
                     k_next = (1-par.delta) * k
-                    b_min = b_min_keep[iz,ib,ik]
+                    b_min = par.b_grid[-1] #b_min_keep[iz,ib,ik]
                     b_next = optimizer(bellman_keep, b_min, par.b_grid[-1], args = (b, k, iz, q_mat, W, par))
 
                     k_policy[iz,ib,ik] = k_next
@@ -190,12 +190,13 @@ def solve_problem_firm_trans(trans, ss, par):
     k_max_adj = ss.k_max_adj
 
     for t in reversed(range(par.T)):
+        print(t)
         if t == par.T - 1:
             Vtemp = ss.V
         else:
             Vtemp = V[t+1]
             
-        V[t], k_policy[t], b_policy[t] = nvfi_step(Vtemp, q_mat[t], exit_policy[t], exit_policy_adj[t], b_min_keep[t], k_max_adj[t], par, solve_b = 'optimizer')
+        V[t], k_policy[t], b_policy[t] = nvfi_step(Vtemp, q_mat[t], exit_policy[t], exit_policy_adj[t], ss.b_min_keep, ss.k_max_adj, par, solve_b = 'optimizer')
     
     trans.V[...] = V
     trans.k_policy[...] = k_policy
@@ -208,7 +209,7 @@ def nvfi_step(V, q_mat, exit_policy, exit_policy_adj, b_min_keep, k_max_adj, par
     if solve_b == 'analytical':
         V_keep, k_keep, b_keep = solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par)
     else:
-        V_keep, k_keep, b_keep = solve_keep(W, exit_policy, q_mat, b_min_keep, par)
+        V_keep, k_keep, b_keep = solve_keep(W, exit_policy, q_mat, par)
     V_adj, k_adj, b_adj = solve_adj(W, exit_policy_adj, q_mat, k_max_adj, b_keep, par)
 
     k_policy = np.where(V_keep >= V_adj, k_keep, k_adj)

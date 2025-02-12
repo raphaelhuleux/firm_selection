@@ -2,30 +2,50 @@ import numpy as np
 from numba import njit 
 from model_functions import fast_expectation
 
-def distribution_ss(par, sol, tol = 1e-8):
+def distribution_ss(par, ss, tol = 1e-8):
     
-    b_i, b_pi = get_lottery(sol.b_policy, par.b_grid)
-    k_i, k_pi = get_lottery(sol.k_policy, par.k_grid)
+    b_i, b_pi = get_lottery(ss.b_policy, par.b_grid)
+    k_i, k_pi = get_lottery(ss.k_policy, par.k_grid)
     o_i, o_pi = get_lottery(par.omega_grid[:,np.newaxis] + par.b_grid[np.newaxis,:], par.b_grid)
 
-    D = np.zeros_like(sol.b_policy)
+    D = np.zeros_like(ss.b_policy)
     D[-1,0,:] = np.ones((par.Nk)) / par.Nk
     #D[0,0,1] = 1
 
     for it in range(25_000):
-        D_new = forward_policy_2d(D, b_i, b_pi, k_i, k_pi, sol.exit_policy, par)
+        D_new = forward_policy_2d(D, b_i, b_pi, k_i, k_pi, ss.exit_policy, par)
         D_new = update_distribution_omega(D_new, o_i, o_pi, par) # update omega
         D_new = fast_expectation(par.P.T, D_new)
         entrants = 1-np.sum(D_new)
         D_new[0,0,1] += entrants# / par.Nz
         if it % 10 == 0 and equal_tolerance(D_new, D, tol):
-            return D_new
+            ss.D[..., :] = D_new
+            break 
         D = D_new   
 
 
-def distribution_trans(par, trans):
-    pass 
+def distribution_trans(trans, ss, par):
 
+    b_policy = trans.b_policy
+    k_policy = trans.b_policy
+    exit_policy = trans.exit_policy
+    o_i, o_pi = get_lottery(par.omega_grid[:,np.newaxis] + par.b_grid[np.newaxis,:], par.b_grid)
+
+    D = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+    D[0] = ss.D 
+
+    for t in range(par.T-1):
+        b_i, b_pi = get_lottery(b_policy[t], par.b_grid)
+        k_i, k_pi = get_lottery(k_policy[t], par.k_grid)
+
+        D[t+1] = forward_policy_2d(D[t], b_i, b_pi, k_i, k_pi, exit_policy[t], par)
+        D[t+1] = update_distribution_omega(D[t+1], o_i, o_pi, par) # update omega
+        D[t+1] = fast_expectation(par.P.T, D[t+1])
+        #entrants = 0 # 1-np.sum(D_new)
+        #D_new[0,0,1] += entrants# / par.Nz
+
+    trans.D[...] = D 
+    
 @njit
 def equal_tolerance(x1, x2, tol):
     # "ravel" flattens both x1 and x2, without making copies, so we can compare the
