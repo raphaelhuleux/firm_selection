@@ -9,42 +9,65 @@ from EconModel import jit
 from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 import time
 
-# Grid search
-model_vfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve': 'grid_search'})
-#model_vfi.prepare()
-#model_vfi.solve()
+# NVFI - analytical
+model_analytical = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'analytical', 'howard': True})   
 
-# NVFI 
-model_nvfi = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve': 'nvfi_analytical'})   
+model_analytical.prepare()
+model_analytical.solve_steady_state()
 
-start = time.perf_counter()  # high-resolution timer
-model_nvfi.prepare()
-model_nvfi.solve()
-end = time.perf_counter()
-print("Elapsed time:", end - start)
+with jit(model_analytical) as model:
+    par = model.par
+    ss = model.ss
 
+plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)))
+plt.xlabel('b')
+plt.ylabel('Density')
+plt.show()
 
-with jit(model_nvfi) as model:
+plt.plot(par.k_grid, np.sum(ss.D, axis = (0,1)))
+plt.xlabel('k')
+plt.ylabel('Density')
+plt.show()
+
+# NVFI - optimizer
+model_optimizer = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'optimizer', 'howard': True})   
+
+model_optimizer.prepare()
+model_optimizer.solve_firm_problem()
+model_optimizer.compute_steady_state_distribution()
+
+with jit(model_optimizer) as model:
     par = model.par
     sol = model.sol
+
+plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)))
+plt.xlabel('b')
+plt.ylabel('Density')
+plt.show()
+
+plt.plot(par.k_grid, np.sum(ss.D, axis = (0,1)))
+plt.xlabel('k')
+plt.ylabel('Density')
+plt.show()
 
 """ 
 Plot policy function
 """
-# NVFI
-par = model_nvfi.par
-sol = model_nvfi.sol
 
-k_policy = sol.k_policy
-b_policy = sol.b_policy
-div_policy = sol.div_policy
-V = sol.V 
+# NVFI
+par = model_optimizer.par
+sol = model_optimizer.sol
+
+k_policy = ss.k_policy
+b_policy = ss.b_policy
+div_policy = ss.div_policy
+V = ss.V 
 
 k_grid = par.k_grid
 
-plt.plot(k_grid, ((1-sol.exit_policy)*b_policy)[0,0,:].T, label = 'b_policy')
-plt.plot(k_grid, ((1-sol.exit_policy)*k_policy)[0,0,:].T- (1-par.delta)*k_grid, label = 'k_policy')
-plt.plot(k_grid, ((1-sol.exit_policy)*div_policy)[0,0,:].T, label = 'div_policy')
+plt.plot(k_grid, ((1-ss.exit_policy)*b_policy)[0,0,:].T, label = 'b_policy')
+plt.plot(k_grid, ((1-ss.exit_policy)*k_policy)[0,0,:].T- (1-par.delta)*k_grid, label = 'k_policy')
+plt.plot(k_grid, ((1-ss.exit_policy)*div_policy)[0,0,:].T, label = 'div_policy')
 
 plt.plot(k_grid, b_policy[-1,0,:].T, label = 'b_policy', linestyle = ':', color = 'C0')
 plt.plot(k_grid, k_policy[-1,0,:].T- (1-par.delta)*k_grid, label = 'k_policy', linestyle = ':', color = 'C1')
@@ -52,23 +75,22 @@ plt.plot(k_grid, div_policy[-1,0,:].T, label = 'div_policy', linestyle = ':', co
 plt.legend()
 plt.show()
 
-
 """ 
 Compare grid-search and NVFI
 """
 
 # Extract parameters and solutions for both models
-par_vfi, sol_vfi = model_vfi.par, model_vfi.sol
-par_nvfi, sol_nvfi = model_nvfi.par, model_nvfi.sol
+par_analytical, sol_vfi = model_analytical.par, model_analytical.sol
+par_optimizer, sol_optimizer = model_optimizer.par, model_optimizer.sol
 
 # Ensure that both grids are the same
-assert np.allclose(par_vfi.k_grid, par_nvfi.k_grid), "k_grids do not match!"
-assert np.allclose(par_vfi.b_grid, par_nvfi.b_grid), "b_grids do not match!"
+assert np.allclose(par_analytical.k_grid, par_optimizer.k_grid), "k_grids do not match!"
+assert np.allclose(par_analytical.b_grid, par_optimizer.b_grid), "b_grids do not match!"
 
 # Extract grids
-k_grid = par_vfi.k_grid
-b_grid = par_vfi.b_grid
-z_grid = par_vfi.z_grid
+k_grid = par_analytical.k_grid
+b_grid = par_analytical.b_grid
+z_grid = par_analytical.z_grid
 
 # Choose a specific productivity level for visualization
 iz = 0  # Choose the lowest productivity level (modify as needed)
@@ -77,10 +99,10 @@ iz = 0  # Choose the lowest productivity level (modify as needed)
 k_policy_vfi = sol_vfi.k_policy[iz, :, :]
 b_policy_vfi = sol_vfi.b_policy[iz, :, :]
 
-k_policy_nvfi = sol_nvfi.k_policy[iz, :, :]
-b_policy_nvfi = sol_nvfi.b_policy[iz, :, :]
+k_policy_nvfi = sol_optimizer.k_policy[iz, :, :]
+b_policy_nvfi = sol_optimizer.b_policy[iz, :, :]
 
-ib_plots = np.arange(0, par_nvfi.Nb, 5)
+ib_plots = np.arange(0, par_optimizer.Nb, 5)
 
 # Create figure with two subplots
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))  

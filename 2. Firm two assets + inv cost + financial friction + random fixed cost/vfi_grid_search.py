@@ -117,7 +117,7 @@ def vfi_step(V, par, sol):
               
     return V_new, k_policy, b_policy
 
-def solve_vfi_grid_search(par, sol, tol = 1e-4, do_howard = True):
+def solve_vfi_grid_search(par, sol, tol = 1e-4):
     error = 1
 
     V_init = np.zeros((par.Nz, par.Nb, par.Nk))
@@ -127,7 +127,7 @@ def solve_vfi_grid_search(par, sol, tol = 1e-4, do_howard = True):
         error = np.sum(np.abs(Vnew - V))
         print(error)
         V = Vnew
-        if do_howard:
+        if par.howard:
             V = howard(V, k_policy, b_policy, par, sol)
 
     sol.inaction[...] = k_policy == (1-par.delta) * par.k_grid[None, None, :]
