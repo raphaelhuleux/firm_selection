@@ -10,22 +10,39 @@ from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 import time
 
 # NVFI - analytical
-model_analytical = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'analytical', 'howard': True})   
+model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'analytical', 'howard': True})   
+model.prepare()
+model.solve_steady_state()
+model.solve_transition()
 
-model_analytical.prepare()
-model_analytical.solve_steady_state()
-model_analytical.solve_transition()
-
-with jit(model_analytical) as model:
+with jit(model) as model:
     par = model.par
     ss = model.ss
     trans = model.trans
 
-ss_K = np.sum(ss.D * ss.k_policy)
-K = np.sum(trans.D * trans.k_policy, axis = (1,2,3))
-q = np.sum(trans.D[1:] * trans.q[:-1], axis = (1,2,3))
-plt.plot(K[1:])
-plt.plot(q)
+ss_B = np.sum(ss.D * par.b_grid[None,:,None])
+ss_K = np.sum(ss.D * par.k_grid[None,None,:])
+
+ss_q = np.sum(ss.D * ss.q)
+
+K = np.sum(trans.D * par.k_grid[None,None,None,:], axis = (1,2,3))
+B = np.sum(trans.D * par.b_grid[None,None,:,None], axis = (1,2,3))
+Q = np.sum(trans.D[1:] * trans.q[:-1], axis = (1,2,3))
+
+plt.plot((K-ss_K)[1:])
+plt.ylabel('K')
+plt.xlabel('t')
+plt.show()
+
+plt.plot(Q-ss_q)
+plt.ylabel('q')
+plt.xlabel('t')
+plt.show()
+
+plt.plot((B-ss_B)[1:])
+plt.ylabel('B')
+plt.xlabel('t')
+plt.show()
 
 plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)))
 plt.xlabel('b')
@@ -37,33 +54,14 @@ plt.xlabel('k')
 plt.ylabel('Density')
 plt.show()
 
-# NVFI - optimizer
-model_optimizer = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'optimizer', 'howard': True})   
-
-model_optimizer.prepare()
-model_optimizer.solve_firm_problem()
-model_optimizer.compute_steady_state_distribution()
-with jit(model_optimizer) as model:
-    par = model.par
-    sol = model.sol
-
-plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)))
-plt.xlabel('b')
-plt.ylabel('Density')
-plt.show()
-
-plt.plot(par.k_grid, np.sum(ss.D, axis = (0,1)))
-plt.xlabel('k')
-plt.ylabel('Density')
-plt.show()
 
 """ 
 Plot policy function
 """
 
 # NVFI
-par = model_optimizer.par
-sol = model_optimizer.sol
+par = model.par
+sol = model.sol
 
 k_policy = ss.k_policy
 b_policy = ss.b_policy
@@ -87,37 +85,29 @@ Compare grid-search and NVFI
 """
 
 # Extract parameters and solutions for both models
-par_analytical, sol_vfi = model_analytical.par, model_analytical.sol
-par_optimizer, sol_optimizer = model_optimizer.par, model_optimizer.sol
-
-# Ensure that both grids are the same
-assert np.allclose(par_analytical.k_grid, par_optimizer.k_grid), "k_grids do not match!"
-assert np.allclose(par_analytical.b_grid, par_optimizer.b_grid), "b_grids do not match!"
+par, sol = model.par, model.sol
 
 # Extract grids
-k_grid = par_analytical.k_grid
-b_grid = par_analytical.b_grid
-z_grid = par_analytical.z_grid
+k_grid = par.k_grid
+b_grid = par.b_grid
+z_grid = par.z_grid
 
 # Choose a specific productivity level for visualization
 iz = 0  # Choose the lowest productivity level (modify as needed)
 
 # Extract policy functions for both methods
-k_policy_vfi = sol_vfi.k_policy[iz, :, :]
-b_policy_vfi = sol_vfi.b_policy[iz, :, :]
+k_policy = sol.k_policy[iz, :, :]
+b_policy = sol.b_policy[iz, :, :]
 
-k_policy_nvfi = sol_optimizer.k_policy[iz, :, :]
-b_policy_nvfi = sol_optimizer.b_policy[iz, :, :]
+ib_plots = np.arange(0, par.Nb, 5)
 
-ib_plots = np.arange(0, par_optimizer.Nb, 5)
-
-# Create figure with two subplots
+# Create figure with two scubplots
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))  
 
 # Plot capital policy function
 for ib in ib_plots:
-    axes[0].plot(k_grid, k_policy_vfi[ib, :], label="grid search", linestyle="solid")
-    axes[0].plot(k_grid, k_policy_nvfi[ib, :], label="nvfi", linestyle="dashed", color = 'black')
+    axes[0].plot(k_grid, k_policy[ib, :], label="grid search", linestyle="solid")
+    axes[0].plot(k_grid, k_policy[ib, :], label="nvfi", linestyle="dashed", color = 'black')
 
 axes[0].set_xlabel("Current Capital (k)")
 axes[0].set_ylabel("Next Period Capital (k')")
@@ -125,8 +115,8 @@ axes[0].set_title(f"Capital Policy Function (z = {z_grid[iz]:.2f})")
 
 # Plot debt policy function
 for ib in ib_plots:
-    axes[1].plot(k_grid, b_policy_vfi[ib, :], label="grid search", linestyle="solid")
-    axes[1].plot(k_grid, b_policy_nvfi[ib, :], label="nvfi", linestyle="dashed", color = 'black')
+    axes[1].plot(k_grid, b_policy[ib, :], label="grid search", linestyle="solid")
+    axes[1].plot(k_grid, b_policy[ib, :], label="nvfi", linestyle="dashed", color = 'black')
 
 axes[1].set_xlabel("Current Capital (k)")
 axes[1].set_ylabel("Next Period Debt (b')")

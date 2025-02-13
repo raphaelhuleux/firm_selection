@@ -8,14 +8,6 @@ from precompute import objective_dividend_keeper
 import quantecon as qe 
 from consav.golden_section_search import optimizer 
 
-""" 
-Problem with the code: 
-when solving the adjuster problem, some intermediate values of k_next between k_min and k_max are not feasible,
-even if k_min and k_max are feasible! this means that there is some strong non-monotonicity in the problem: 
-increasing k_next might actually make you more.
-Maybe the issue is with the price function q that looks like a step function
-Also try to redo compute_exit_decision_step with a dense grid_search?
-"""
 
 """
 VFI 
@@ -186,9 +178,7 @@ def solve_problem_firm_trans(trans, ss, par):
     q_mat = trans.q 
     exit_policy = trans.exit_policy
     exit_policy_adj = trans.exit_policy_adj
-    b_min_keep = ss.b_min_keep
-    k_max_adj = ss.k_max_adj
-
+    
     for t in reversed(range(par.T)):
         print(t)
         if t == par.T - 1:
@@ -204,7 +194,8 @@ def solve_problem_firm_trans(trans, ss, par):
 
 
 def nvfi_step(V, q_mat, exit_policy, exit_policy_adj, b_min_keep, k_max_adj, par, solve_b = 'analytical'):
-    W = par.beta * fast_expectation(par.P, V)
+    #W = par.beta * fast_expectation(par.P, V)
+    W = par.beta * multiply_ith_dimension(par.P, 0, V)
     W = compute_expectation_omega(W, par)
     if solve_b == 'analytical':
         V_keep, k_keep, b_keep = solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par)
@@ -270,7 +261,8 @@ def howard_step_nvfi(W, k_policy, b_policy, ss, par):
 def howard_nvfi(V, k_policy, b_policy, ss,  par, tol = 1e-4, iter_max = 1000):
 
     for n in range(20):
-        W = par.beta * fast_expectation(par.P, V)
+        W = par.beta * multiply_ith_dimension(par.P, 0, V)
+        #W = par.beta * fast_expectation(par.P, V)
         W = compute_expectation_omega(W, par)
         V = howard_step_nvfi(W, k_policy, b_policy, ss, par)
 

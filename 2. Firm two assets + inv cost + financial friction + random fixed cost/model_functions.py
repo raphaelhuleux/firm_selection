@@ -1,13 +1,10 @@
 
 import numpy as np 
-import numba as nb 
 import matplotlib.pyplot as plt
-import quantecon as qe 
 from consav.linear_interp_1d import interp_1d, interp_1d_vec
 from consav.linear_interp_2d import interp_2d, interp_2d_vec
 from numba import njit, prange
 import quantecon as qe 
-from consav.golden_section_search import optimizer 
 
 
 @njit 
@@ -88,3 +85,17 @@ def debt_price_function(iz, k_next, b_next, r, exit_policy, par):
         q += q_temp 
     
     return q 
+
+def multiply_ith_dimension(Pi, i, X):
+    """If Pi is a matrix, multiply Pi times the ith dimension of X and return"""
+    
+    X = np.swapaxes(X, 0, i)
+    shape = X.shape
+    X = X.reshape(shape[0], -1)
+
+    # iterate forward using Pi
+    X = Pi @ X
+
+    # reverse steps
+    X = X.reshape(Pi.shape[0], *shape[1:])
+    return np.swapaxes(X, 0, i)

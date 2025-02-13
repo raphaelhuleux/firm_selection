@@ -1,8 +1,8 @@
 import numpy as np 
 from numba import njit 
-from model_functions import fast_expectation
+from model_functions import fast_expectation, multiply_ith_dimension
 
-def distribution_ss(par, ss, tol = 1e-8):
+def distribution_ss(ss, par, tol = 1e-8):
     
     b_i, b_pi = get_lottery(ss.b_policy, par.b_grid)
     k_i, k_pi = get_lottery(ss.k_policy, par.k_grid)
@@ -15,9 +15,10 @@ def distribution_ss(par, ss, tol = 1e-8):
     for it in range(25_000):
         D_new = forward_policy_2d(D, b_i, b_pi, k_i, k_pi, ss.exit_policy, par)
         D_new = update_distribution_omega(D_new, o_i, o_pi, par) # update omega
-        D_new = fast_expectation(par.P.T, D_new)
+        #D_new = fast_expectation(par.P, D_new)
+        D_new = multiply_ith_dimension(par.P.T, 0, D_new)
         entrants = 1-np.sum(D_new)
-        D_new[0,0,1] += entrants# / par.Nz
+        D_new[:,0,1] += entrants / par.Nz
         if it % 10 == 0 and equal_tolerance(D_new, D, tol):
             ss.D[..., :] = D_new
             break 
@@ -27,7 +28,7 @@ def distribution_ss(par, ss, tol = 1e-8):
 def distribution_trans(trans, ss, par):
 
     b_policy = trans.b_policy
-    k_policy = trans.b_policy
+    k_policy = trans.k_policy
     exit_policy = trans.exit_policy
     o_i, o_pi = get_lottery(par.omega_grid[:,np.newaxis] + par.b_grid[np.newaxis,:], par.b_grid)
 
@@ -40,12 +41,14 @@ def distribution_trans(trans, ss, par):
 
         D[t+1] = forward_policy_2d(D[t], b_i, b_pi, k_i, k_pi, exit_policy[t], par)
         D[t+1] = update_distribution_omega(D[t+1], o_i, o_pi, par) # update omega
-        D[t+1] = fast_expectation(par.P.T, D[t+1])
-        #entrants = 0 # 1-np.sum(D_new)
-        #D_new[0,0,1] += entrants# / par.Nz
+        #D[t+1] = fast_expectation(par.P.T, D[t+1])
+        D[t+1] = multiply_ith_dimension(par.P.T, 0, D[t+1])
+
+        entrants = 1-np.sum(D[t+1])
+        D[t+1,:,0,1] += entrants / par.Nz
 
     trans.D[...] = D 
-    
+
 @njit
 def equal_tolerance(x1, x2, tol):
     # "ravel" flattens both x1 and x2, without making copies, so we can compare the

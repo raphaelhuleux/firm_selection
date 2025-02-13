@@ -24,29 +24,28 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans = self.trans
 
         # Parameters
-        par.alpha = 1/3 # capital share
-        par.beta = 1/(1+0.05) # discount factor
-        par.delta = 0.1 # depreciation rate
+        par.alpha = 0.21 # capital share
+        par.beta = 0.99 # discount factor
+        par.delta = 0.025 # depreciation rate
 
-        par.rho = 0.8 # AR(1) shock
-        par.sigma_z = 0.2 # std. dev. of shock
+        par.rho = 0.9 # AR(1) shock
+        par.sigma_z = 0.03 # std. dev. of shock
         par.omega_sigma = 0.5
         par.psi = 0.05 # convex adjustment cost
         par.xi = 0.0001 # fixed adjustment cost
         par.cf = 0.1 # fixed cost
 
-        par.nu = 100 #  0.9 # leverage ratio
         par.r = (1/par.beta - 1) * 1.1
 
         # Steady state
         par.z_bar = 1
         par.kbar = (par.alpha * par.z_bar /(1/par.beta-1+par.delta))**(1/(1-par.alpha))
 
-        par.T = 100 
+        par.T = 150 
 
         # r shock 
-        par.rho_r = 0.4 
-        par.sigma_r = 0.0025
+        par.rho_r = 0.61
+        par.sigma_r = 0.01/4
         trans.r = par.r + par.sigma_r * par.rho_r **(np.arange(par.T))
 
         # Grid
@@ -62,7 +61,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.k_max = 3*par.kbar
 
         par.b_min = 0
-        par.b_max = par.k_max / 3 # min(par.nu*par.k_max, par.k_max) 
+        par.b_max = par.k_max / 3  
 
         # Algo 
         par.tol = 1e-6
@@ -96,10 +95,6 @@ class HeterogenousFirmsModelClass(EconModelClass):
         ss.exit_policy_adj = np.zeros((par.Nz, par.Nb, par.Nk))
 
         ss.q = np.zeros((par.Nz, par.Nb, par.Nk))
-
-        if par.solve == 'nvfi_analytical':
-            ss.q = np.zeros((par.Nz, par.Nb, par.Nk))
-
         ss.b_min_keep = np.zeros((par.Nz, par.Nb, par.Nk))
         ss.k_max_adj = np.zeros((par.Nz, par.Nb, par.Nk))
 
@@ -109,7 +104,6 @@ class HeterogenousFirmsModelClass(EconModelClass):
         ss.b_policy = np.zeros((par.Nz, par.Nb, par.Nk))
         ss.k_policy = np.zeros((par.Nz, par.Nb, par.Nk))
         ss.V = np.zeros((par.Nz, par.Nb, par.Nk))
-
         ss.D = np.zeros((par.Nz, par.Nb, par.Nk))
 
         # Trans
@@ -121,14 +115,13 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans.V = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
         trans.D = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
 
-    
     def prepare(self): # required
         """ precompute specific arrays before ssving the model"""
         with jit(self) as model:
             par = model.par
             ss = model.ss
 
-            ss.exit_policy[...], ss.exit_policy_adj[...], ss.q[...] = compute_exit_decision_ss(par.r, par)
+            ss.exit_policy[...], ss.exit_policy_adj[...], ss.q[...] = compute_exit_decision_ss(ss.r, par)
             ss.b_min_keep[...] = compute_b_min(ss.q, ss.exit_policy, par)
             ss.k_max_adj[...] = compute_k_max(ss.q, ss.exit_policy, par)
 
@@ -143,7 +136,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
             elif model.par.solve == 'nvfi':
                 solve_nvfi_ss(ss, par)
 
-            distribution_ss(par, ss)
+            distribution_ss(ss, par)
 
     def solve_transition(self):
         with jit(self) as model:
