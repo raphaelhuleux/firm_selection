@@ -23,7 +23,6 @@ def compute_exit_decision_adj(q, exit_policy, par):
                 else:
                     b = par.b_grid[ib]
                     k = par.k_grid[ik]
-                    z = par.z_grid[iz]
 
                     b_next = optimizer(objective_dividend_adj, b_grid[0], b_grid[-1], args=(iz, b, k, q, par))
                     div = -objective_dividend_adj(b_next, iz, b, k, q, par)  
@@ -40,7 +39,7 @@ def compute_exit_decision_trans(r_trans, ss, par):
     exit_policy_trans = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
     exit_policy_adj_trans = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
 
-    for t in range(par.T-1, -1, -1):
+    for t in reversed(range(par.T)):
         print(t)
         if t == par.T-1:
             q_trans[t] = compute_q_matrix(ss.exit_policy, ss.r, par)
@@ -61,7 +60,7 @@ def compute_exit_decision_trans_step(exit_policy, q, par, tol = 5e-4):
         exit_policy_new = compute_exit_decision_step(q, par)
         error = np.sum(np.abs(exit_policy_new - exit_policy))
         exit_policy = exit_policy_new
-    exit_policy[:,:,0] = 1
+    #exit_policy[:,:,0] = 1
 
     return exit_policy
   
@@ -70,7 +69,8 @@ def compute_exit_decision_ss(r, par):
     Iteratively update the exit decision function until convergence
     """
 
-    exit_policy = np.ones((par.Nz,par.Nb,par.Nk))
+    exit_policy = np.zeros((par.Nz,par.Nb,par.Nk))
+    exit_policy[:,:,0] = 1
 
     error = 1 
     tol = 5e-4
@@ -80,7 +80,6 @@ def compute_exit_decision_ss(r, par):
         error = np.sum(np.abs(exit_policy_new - exit_policy))
         print(error)
         exit_policy = exit_policy_new
-    exit_policy[:,:,0] = 1
     
     exit_policy_adj = compute_exit_decision_adj(q, exit_policy, par)
 

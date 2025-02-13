@@ -10,7 +10,7 @@ from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 import time
 
 # NVFI - analytical
-model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'analytical', 'howard': True})   
+model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'optimizer', 'howard': False})   
 model.prepare()
 model.solve_steady_state()
 model.solve_transition()
@@ -20,36 +20,50 @@ with jit(model) as model:
     ss = model.ss
     trans = model.trans
 
+plt.plot(par.b_grid, ss.q[:,:,1].T)
+plt.plot(par.b_grid, np.ones_like(par.b_grid)*(1/(1+ss.r)), linestyle = '--')
+plt.xlabel('b')
+plt.ylabel('q')
+plt.show()
+
 ss_B = np.sum(ss.D * par.b_grid[None,:,None])
 ss_K = np.sum(ss.D * par.k_grid[None,None,:])
 
 ss_q = np.sum(ss.D * ss.q)
 
+share_default = np.sum((ss.exit_policy==1) * ss.D)
+
 K = np.sum(trans.D * par.k_grid[None,None,None,:], axis = (1,2,3))
 B = np.sum(trans.D * par.b_grid[None,None,:,None], axis = (1,2,3))
 Q = np.sum(trans.D[1:] * trans.q[:-1], axis = (1,2,3))
 
-plt.plot((K-ss_K)[1:])
+np.max(np.abs(trans.q - ss.q))
+
+np.max(np.abs(trans.k_policy[-1] - ss.k_policy))
+
+plt.plot(K-ss_K)
 plt.ylabel('K')
 plt.xlabel('t')
 plt.show()
 
-plt.plot(Q-ss_q)
-plt.ylabel('q')
+plt.plot(1/Q-1 - (1/ss_q-1))
+plt.ylabel('r (implied)')
 plt.xlabel('t')
 plt.show()
 
-plt.plot((B-ss_B)[1:])
+plt.plot(B-ss_B)
 plt.ylabel('B')
 plt.xlabel('t')
 plt.show()
 
 plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)))
+plt.plot(par.b_grid, np.sum(trans.D[-1], axis = (0,2)))
 plt.xlabel('b')
 plt.ylabel('Density')
 plt.show()
 
 plt.plot(par.k_grid, np.sum(ss.D, axis = (0,1)))
+plt.plot(par.k_grid, np.sum(trans.D[-1], axis = (0,1)))
 plt.xlabel('k')
 plt.ylabel('Density')
 plt.show()

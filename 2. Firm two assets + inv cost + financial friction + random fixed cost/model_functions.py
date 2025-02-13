@@ -9,7 +9,7 @@ import quantecon as qe
 
 @njit 
 def compute_adjustment_cost(k_next, k, delta, psi, xi):
-    return psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k
+    return psi / 2 * (k_next - (1-delta)*k)**2 / (k+1e-6) + xi * k
 
 
 @njit

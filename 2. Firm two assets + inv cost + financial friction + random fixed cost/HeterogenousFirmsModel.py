@@ -61,7 +61,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.k_max = 3*par.kbar
 
         par.b_min = 0
-        par.b_max = par.k_max / 3  
+        par.b_max = par.k_max / 2  
 
         # Algo 
         par.tol = 1e-6
