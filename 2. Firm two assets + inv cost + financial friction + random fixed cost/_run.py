@@ -13,9 +13,12 @@ import time
 Todo:
 - Add checks that constraints are met in policy functions
 - Add checks that constraints are met in transition
+- Add recovery of the bank 
+- Add firm discount future profits by the interest rate
 """
+
 # NVFI - analytical
-model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'nu':0.9,'solve_b': 'analytical', 'howard': True, 'iter_howard':50})   
+model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'nu':0.9,'recovery':0.54,'solve_b': 'analytical', 'howard': True, 'iter_howard':50})   
 model.prepare()
 model.solve_steady_state()
 model.solve_transition()
@@ -34,7 +37,7 @@ plt.show()
 b_policy = ss.b_policy
 k_policy = ss.k_policy
 
-print('nu * k' - b' =', np.min(par.nu * k_policy - b_policy))
+print("nu * k' - b' =", np.min(par.nu * k_policy - b_policy))
 
 ss_B = np.sum(ss.D * par.b_grid[None,:,None])
 ss_K = np.sum(ss.D * par.k_grid[None,None,:])

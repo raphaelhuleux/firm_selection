@@ -76,12 +76,13 @@ def debt_price_function(iz, k_next, b_next, r, exit_policy, par):
     q = 0.0
 
     for iz_prime in range(par.Nz):
-        for i_omega in range(par.Nomega):
+        for i_omega in range(par.Nomega): 
             b_next_tilde = b_next + par.omega_grid[i_omega]
+            n = np.minimum((par.recovery * (1-par.delta) * k_next) / np.maximum(b_next, 1e-4), 1)
             Pz = par.P[iz,iz_prime] * par.omega_p[i_omega]
-            exit_prob = interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next)
-            q_temp = 1/(1+r) * np.maximum(1 - exit_prob,0)
-            q += Pz * q_temp
+            prob_default = np.minimum(interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next), 1)
+            q_temp = 1/(1+r) * ((1-prob_default) + prob_default * n) 
+            q += Pz * q_temp    
     """ 
     for iz_prime in range(par.Nz):
         Pz = par.P[iz,iz_prime] * par.omega_p

@@ -35,8 +35,9 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.xi = 0.0001 # fixed adjustment cost
         par.cf = 0.1 # fixed cost
         par.nu = 100 # leverage ratio
+        par.recovery = 0.2 # 54
 
-        par.r = (1/par.beta - 1) * 1.1
+        par.r = (1/par.beta - 1) * 1.05
 
         # Steady state
         par.z_bar = 1
@@ -62,7 +63,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.k_max = 3*par.kbar
 
         par.b_min = 0
-        par.b_max = par.k_max / 2  
+        par.b_max = par.k_max /2
 
         # Algo 
         par.tol = 1e-6
