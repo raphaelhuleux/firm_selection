@@ -37,7 +37,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.nu = 100 # leverage ratio
         par.recovery = 0.2 # 54
 
-        par.r = (1/par.beta - 1) * 1.05
+        par.r = (1/par.beta - 1) * 1.02
 
         # Steady state
         par.z_bar = 1
@@ -60,7 +60,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.Nb_choice = 100
 
         par.k_min = 0.0
-        par.k_max = 3*par.kbar
+        par.k_max = 4*par.kbar
 
         par.b_min = 0
         par.b_max = par.k_max /2

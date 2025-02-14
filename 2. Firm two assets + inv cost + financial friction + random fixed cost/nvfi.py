@@ -63,10 +63,6 @@ def solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par):
 
     return V_new, k_policy, b_policy
 
-#V_temp = np.zeros_like(par.b_grid)
-#for i, b_next in enumerate(par.b_grid):
-#    V_temp[i] = bellman_keep(b_next, b, k, iz, q_mat, W, par)
-#plt.plot(V_temp[:5])
 
 @njit(parallel = True)
 def solve_keep(W, exit_policy, q_mat, par):

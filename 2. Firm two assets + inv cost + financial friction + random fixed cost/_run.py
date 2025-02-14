@@ -1,20 +1,15 @@
 import numpy as np 
-import numba as nb 
 import matplotlib.pyplot as plt
-import quantecon as qe 
-from consav.linear_interp_2d import interp_2d
-from numba import njit, prange
-import quantecon as qe 
 from EconModel import jit
 from HeterogenousFirmsModel import HeterogenousFirmsModelClass
-import time
 
 """ 
 Todo:
+- Add exit shocks
 - Add checks that constraints are met in policy functions
 - Add checks that constraints are met in transition
-- Add recovery of the bank 
 - Add firm discount future profits by the interest rate
+- Compute life cycle of a firm
 """
 
 # NVFI - analytical
@@ -36,7 +31,7 @@ plt.show()
 
 b_policy = ss.b_policy
 k_policy = ss.k_policy
-
+print('share debt = ', 1-np.sum(ss.D[:,0,:]))
 print("nu * k' - b' =", np.min(par.nu * k_policy - b_policy))
 
 ss_B = np.sum(ss.D * par.b_grid[None,:,None])
@@ -113,7 +108,7 @@ Compare grid-search and NVFI
 """
 
 # Extract parameters and solutions for both models
-par, sol = model.par, model.sol
+par, sol = model.par, model.ss
 
 # Extract grids
 k_grid = par.k_grid
