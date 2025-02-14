@@ -34,6 +34,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.psi = 0.05 # convex adjustment cost
         par.xi = 0.0001 # fixed adjustment cost
         par.cf = 0.1 # fixed cost
+        par.nu = 100 # leverage ratio
 
         par.r = (1/par.beta - 1) * 1.1
 
@@ -65,6 +66,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
 
         # Algo 
         par.tol = 1e-6
+        par.iter_howard = 20
         par.howard = True 
         par.solve = 'nvfi'
         par.solve_b = 'analytical'

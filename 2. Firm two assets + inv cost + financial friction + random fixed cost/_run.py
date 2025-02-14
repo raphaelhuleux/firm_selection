@@ -9,8 +9,13 @@ from EconModel import jit
 from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 import time
 
+""" 
+Todo:
+- Add checks that constraints are met in policy functions
+- Add checks that constraints are met in transition
+"""
 # NVFI - analytical
-model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'optimizer', 'howard': False})   
+model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'nu':0.9,'solve_b': 'analytical', 'howard': True, 'iter_howard':50})   
 model.prepare()
 model.solve_steady_state()
 model.solve_transition()
@@ -20,15 +25,21 @@ with jit(model) as model:
     ss = model.ss
     trans = model.trans
 
-plt.plot(par.b_grid, ss.q[:,:,1].T)
+plt.plot(par.b_grid, ss.q[0,:,[0,1,2,5,10,15,20]].T)
 plt.plot(par.b_grid, np.ones_like(par.b_grid)*(1/(1+ss.r)), linestyle = '--')
 plt.xlabel('b')
 plt.ylabel('q')
 plt.show()
 
+b_policy = ss.b_policy
+k_policy = ss.k_policy
+
+print('nu * k' - b' =', np.min(par.nu * k_policy - b_policy))
+
 ss_B = np.sum(ss.D * par.b_grid[None,:,None])
 ss_K = np.sum(ss.D * par.k_grid[None,None,:])
 
+np.max((np.abs(ss.q - 1/(1+ss.r))))
 ss_q = np.sum(ss.D * ss.q)
 
 share_default = np.sum((ss.exit_policy==1) * ss.D)

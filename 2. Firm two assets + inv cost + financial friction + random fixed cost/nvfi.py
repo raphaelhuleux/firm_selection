@@ -27,7 +27,9 @@ def bellman_keep(b_next, b, k, iz, q_mat, W, par):
 
     penalty = 0.0 
     if div < 0.0:
-        penalty = np.abs(div*1e6)
+        penalty += np.abs(div)*1e3
+    if par.nu * k_next < b_next:
+        penalty += np.abs(par.nu * k_next - b_next)*1e3
     
     V = div + interp_2d(par.b_grid, par.k_grid, W[iz], b_next, k_next)
     
@@ -53,13 +55,18 @@ def solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par):
                 else:
                     k = par.k_grid[ik]
                     k_next = (1-par.delta) * k
-                    b_next =  b_min_keep[iz,ib,ik]
+                    b_next =  np.minimum(b_min_keep[iz,ib,ik], par.nu * k_next)
 
                     k_policy[iz,ib,ik] = k_next
                     b_policy[iz,ib,ik] = b_next
                     V_new[iz,ib,ik] = -bellman_keep(b_next, b, k, iz, q_mat, W, par)
 
     return V_new, k_policy, b_policy
+
+#V_temp = np.zeros_like(par.b_grid)
+#for i, b_next in enumerate(par.b_grid):
+#    V_temp[i] = bellman_keep(b_next, b, k, iz, q_mat, W, par)
+#plt.plot(V_temp[:5])
 
 @njit(parallel = True)
 def solve_keep(W, exit_policy, q_mat, par):
@@ -81,12 +88,19 @@ def solve_keep(W, exit_policy, q_mat, par):
                 else:
                     k = par.k_grid[ik]
                     k_next = (1-par.delta) * k
-                    b_min = par.b_grid[-1] #b_min_keep[iz,ib,ik]
-                    b_next = optimizer(bellman_keep, b_min, par.b_grid[-1], args = (b, k, iz, q_mat, W, par))
+                    b_min = par.b_grid[0] #b_min_keep[iz,ib,ik]
+                    b_max = np.minimum(par.nu * k_next, par.b_grid[-1])
+                    b_opt = optimizer(bellman_keep, b_min, b_max, args = (b, k, iz, q_mat, W, par))
 
+                    V_opt = -bellman_keep(b_opt, b, k, iz, q_mat, W, par)
+                    V_min = -bellman_keep(b_min, b, k, iz, q_mat, W, par)
+                    if V_min < V_opt:
+                        b_policy[iz,ib,ik] = b_opt
+                        V_new[iz,ib,ik] = V_opt
+                    else:
+                        b_policy[iz,ib,ik] = b_min
+                        V_new[iz,ib,ik] = V_min
                     k_policy[iz,ib,ik] = k_next
-                    b_policy[iz,ib,ik] = b_next
-                    V_new[iz,ib,ik] = -bellman_keep(b_next, b, k, iz, q_mat, W, par)
 
     return V_new, k_policy, b_policy
 
@@ -109,9 +123,11 @@ def bellman_adj(k_next, b, k, iz, q_mat, b_keep, W, par):
     div = y + (1-par.delta) * k - b - k_next + b_next * q - adj_cost
 
     penalty = 0.0
+
     if div < 0:
-        penalty += np.abs(div*1e6)
-    
+        penalty += np.abs(div*1e3)
+    if par.nu * k_next < b_next:
+        penalty += np.abs((par.nu * k_next - b_next)*1e3)
     V = div + interp_2d(par.b_grid, par.k_grid, W[iz], b_next, k_next)
 
     #V = bellman_keep(b_next, b_tilde, k_next / (1-par.delta), iz, W, par, sol)
@@ -164,7 +180,8 @@ def solve_adj(W, exit_policy_adj, q_mat, k_max_adj, b_keep, par):
 
                     b_policy[iz,ib,ik] = b_next
                     k_policy[iz,ib,ik] = k_next
-                    V_new[iz,ib,ik] = bellman_invest(k_next, b_next, b, k, iz, q_mat, W, par)
+                    #V_new[iz,ib,ik] = bellman_invest(k_next, b_next, b, k, iz, q_mat, W, par)
+                    V_new[iz,ib,ik] = -bellman_adj(k_next, b, k, iz, q_mat, b_keep, W, par)
 
     return V_new, k_policy, b_policy
 
@@ -258,9 +275,9 @@ def howard_step_nvfi(W, k_policy, b_policy, ss, par):
                         V_new[iz, ib, ik] = bellman_invest(k_next, b_next, b, k, iz, ss.q, W, par)
     return V_new
 
-def howard_nvfi(V, k_policy, b_policy, ss,  par, tol = 1e-4, iter_max = 1000):
+def howard_nvfi(V, k_policy, b_policy, ss,  par):
 
-    for n in range(20):
+    for n in range(par.iter_howard):
         W = par.beta * multiply_ith_dimension(par.P, 0, V)
         #W = par.beta * fast_expectation(par.P, V)
         W = compute_expectation_omega(W, par)

@@ -9,7 +9,7 @@ import quantecon as qe
 
 @njit 
 def compute_adjustment_cost(k_next, k, delta, psi, xi):
-    return psi / 2 * (k_next - (1-delta)*k)**2 / (k+1e-6) + xi * k
+    return psi / 2 * (k_next - (1-delta)*k)**2 / np.maximum(k,1e-6) + xi * k
 
 
 @njit
@@ -74,16 +74,22 @@ def compute_expectation_omega(V, par):
 @njit
 def debt_price_function(iz, k_next, b_next, r, exit_policy, par):
     q = 0.0
-    k_next = np.ones_like(par.omega_grid) * k_next
-    
+
     for iz_prime in range(par.Nz):
-        b_next_tilde = b_next + par.omega_grid
+        for i_omega in range(par.Nomega):
+            b_next_tilde = b_next + par.omega_grid[i_omega]
+            Pz = par.P[iz,iz_prime] * par.omega_p[i_omega]
+            exit_prob = interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next)
+            q_temp = 1/(1+r) * np.maximum(1 - exit_prob,0)
+            q += Pz * q_temp
+    """ 
+    for iz_prime in range(par.Nz):
         Pz = par.P[iz,iz_prime] * par.omega_p
         exit_prob = np.zeros_like(b_next_tilde)
         interp_2d_vec(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next, exit_prob)
-        q_temp =  np.sum(1/(1+r) * (1 - exit_prob) * Pz) 
+        q_temp =  np.sum(1/(1+r) * np.maximum(1 - exit_prob,0) * Pz) 
         q += q_temp 
-    
+    """
     return q 
 
 def multiply_ith_dimension(Pi, i, X):

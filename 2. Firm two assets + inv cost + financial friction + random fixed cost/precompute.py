@@ -24,7 +24,10 @@ def compute_exit_decision_adj(q, exit_policy, par):
                     b = par.b_grid[ib]
                     k = par.k_grid[ik]
 
-                    b_next = optimizer(objective_dividend_adj, b_grid[0], b_grid[-1], args=(iz, b, k, q, par))
+                    k_next = (1-par.delta) * k + 1e-6 
+                    b_max = np.minimum(par.nu * k_next, par.b_grid[-1])
+
+                    b_next = optimizer(objective_dividend_adj, b_grid[0], b_max, args=(iz, b, k, q, par))
                     div = -objective_dividend_adj(b_next, iz, b, k, q, par)  
                     if div >= 0.0:
                         exit_policy_adj[iz,ib,ik] = 0
@@ -70,7 +73,7 @@ def compute_exit_decision_ss(r, par):
     """
 
     exit_policy = np.zeros((par.Nz,par.Nb,par.Nk))
-    exit_policy[:,:,0] = 1
+    #exit_policy[:,:,0] = 1
 
     error = 1 
     tol = 5e-4
@@ -103,11 +106,12 @@ def compute_exit_decision_step(q, par):
         z = z_grid[iz]
         for ik in range(Nk):
             k = k_grid[ik]
+            k_next = (1-par.delta) * k
+
             for ib in range(Nb):
                 b = b_grid[ib]
-                b_max = b_grid[-1] # par.nu * (1-par.delta) * k
-                k_next = (1-par.delta) * k_grid[ik]
-
+                b_max = np.minimum(par.nu*k_next, par.b_grid[-1])
+            
                 # Check div_policy when b_next = b_max 
                 div_b_max = -objective_dividend_keeper(b_max, k_next, z, b, k, iz, q, par)
 
@@ -136,7 +140,6 @@ def objective_dividend_keeper(b_next, k_next, z, b, k, iz, q_mat, par):
     q = interp_2d(par.b_grid, par.k_grid, q_mat[iz], b_next, k_next)
     div = z * k**par.alpha + q * b_next - b
     return -div
-
 
 @njit(parallel=True)
 def compute_q_matrix(exit_policy, r, par):
@@ -182,7 +185,7 @@ def compute_b_min(q_mat, exit_policy, par):
             for ib in range(Nb):
                 b = b_grid[ib] 
                 k_next = (1-delta) * k
-                b_max = par.b_grid[-1]
+                b_max = np.minimum(par.nu * k_next, par.b_grid[-1])
 
                 if exit_policy[iz,ib,ik] == 1:
                     continue
@@ -242,5 +245,4 @@ def compute_k_max(q_mat, exit_policy, par):
                 k_max_adj[iz,ib,ik] = par.k_grid[-1]
     
     return k_max_adj
-
 
