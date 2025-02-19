@@ -33,14 +33,16 @@ def distribution_trans(trans, ss, par):
     o_i, o_pi = get_lottery(par.omega_grid[:,np.newaxis] + par.b_grid[np.newaxis,:], par.b_grid)
 
     D = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+    D_hat = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
     D[0] = ss.D 
+    D_hat[0] = ss.D
 
     for t in range(par.T-1):
         b_i, b_pi = get_lottery(b_policy[t], par.b_grid)
         k_i, k_pi = get_lottery(k_policy[t], par.k_grid)
 
-        D[t+1] = forward_policy_2d(D[t], b_i, b_pi, k_i, k_pi, exit_policy[t], par)
-        D[t+1] = update_distribution_omega(D[t+1], o_i, o_pi, par) # update omega
+        D_hat[t+1] = forward_policy_2d(D[t], b_i, b_pi, k_i, k_pi, exit_policy[t], par)
+        D[t+1] = update_distribution_omega(D_hat[t+1], o_i, o_pi, par) # update omega
         #D[t+1] = fast_expectation(par.P.T, D[t+1])
         D[t+1] = multiply_ith_dimension(par.P.T, 0, D[t+1])
 
@@ -48,6 +50,7 @@ def distribution_trans(trans, ss, par):
         D[t+1,:,0,1] += entrants / par.Nz
 
     trans.D[...] = D 
+    trans.D_hat[...] = D_hat
 
 @njit
 def equal_tolerance(x1, x2, tol):
@@ -99,7 +102,6 @@ def get_lottery(xq, x):
 def forward_policy_2d(D, b_i, b_pi, k_i, k_pi, exit_policy, par):
 
     Dnew = np.zeros(D.shape)
-    nZ, nB, nK = D.shape
 
     for iz in range(par.Nz):
         for ib in range(par.Nb):
@@ -112,10 +114,10 @@ def forward_policy_2d(D, b_i, b_pi, k_i, k_pi, exit_policy, par):
 
                     ibp = b_i[iz, ib, ik]
                     beta = b_pi[iz, ib, ik]
-                    Dnew[iz, ibp,     ikp] += alpha     * beta     * D[iz, ib, ik]
-                    Dnew[iz, ibp+1,   ikp] += alpha     * (1-beta) * D[iz, ib, ik]
-                    Dnew[iz, ibp,   ikp+1] += (1-alpha) * beta     * D[iz, ib, ik]
-                    Dnew[iz, ibp+1, ikp+1] += (1-alpha) * (1-beta) * D[iz, ib, ik]
+                    Dnew[iz, ibp,     ikp] += (1-par.pi_d) * alpha     * beta     * D[iz, ib, ik]
+                    Dnew[iz, ibp+1,   ikp] += (1-par.pi_d) * alpha     * (1-beta) * D[iz, ib, ik]
+                    Dnew[iz, ibp,   ikp+1] += (1-par.pi_d) * (1-alpha) * beta     * D[iz, ib, ik]
+                    Dnew[iz, ibp+1, ikp+1] += (1-par.pi_d) * (1-alpha) * (1-beta) * D[iz, ib, ik]
 
     return Dnew
 

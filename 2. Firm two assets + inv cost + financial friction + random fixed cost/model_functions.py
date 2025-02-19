@@ -6,11 +6,9 @@ from consav.linear_interp_2d import interp_2d, interp_2d_vec
 from numba import njit, prange
 import quantecon as qe 
 
-
 @njit 
 def compute_adjustment_cost(k_next, k, delta, psi, xi):
     return psi / 2 * (k_next - (1-delta)*k)**2 / np.maximum(k,1e-6) + xi * k
-
 
 @njit
 def dividend_fun(b_next, k_next, z, b, k, iz, sol, par):
@@ -23,7 +21,7 @@ def dividend_fun(b_next, k_next, z, b, k, iz, sol, par):
     return div
 
 @njit 
-def compute_optimal_div_policy(b_policy, k_policy, par, sol):
+def compute_optimal_div_policy(b_policy, k_policy, par, ss):
     Nz, Nb, Nk = par.Nz, par.Nb, par.Nk
     z_grid, b_grid, k_grid = par.z_grid, par.b_grid, par.k_grid
 
@@ -34,13 +32,13 @@ def compute_optimal_div_policy(b_policy, k_policy, par, sol):
             for ib in range(Nb):
                 b = b_grid[ib] 
 
-                if sol.exit_policy[iz,ib,ik] == 1:
-                    sol.div_policy[iz,ib,ik] = -np.inf
+                if ss.exit_policy[iz,ib,ik] == 1:
+                    ss.div_policy[iz,ib,ik] = -np.inf
 
                 else:
                     b_next = b_policy[iz,ib,ik]
                     k_next = k_policy[iz,ib,ik]
-                    sol.div_policy[iz,ib,ik] = dividend_fun(b_next, k_next, z, b, k, iz, sol, par)
+                    ss.div_policy[iz,ib,ik] = dividend_fun(b_next, k_next, z, b, k, iz, ss, par)
 
 
 @njit
@@ -80,17 +78,10 @@ def debt_price_function(iz, k_next, b_next, r, exit_policy, par):
             b_next_tilde = b_next + par.omega_grid[i_omega]
             n = np.minimum((par.recovery * (1-par.delta) * k_next) / np.maximum(b_next, 1e-4), 1)
             Pz = par.P[iz,iz_prime] * par.omega_p[i_omega]
-            prob_default = np.minimum(interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next), 1)
+            prob_default = np.minimum(interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next), 1) + par.pi_d
             q_temp = 1/(1+r) * ((1-prob_default) + prob_default * n) 
             q += Pz * q_temp    
-    """ 
-    for iz_prime in range(par.Nz):
-        Pz = par.P[iz,iz_prime] * par.omega_p
-        exit_prob = np.zeros_like(b_next_tilde)
-        interp_2d_vec(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next, exit_prob)
-        q_temp =  np.sum(1/(1+r) * np.maximum(1 - exit_prob,0) * Pz) 
-        q += q_temp 
-    """
+
     return q 
 
 def multiply_ith_dimension(Pi, i, X):

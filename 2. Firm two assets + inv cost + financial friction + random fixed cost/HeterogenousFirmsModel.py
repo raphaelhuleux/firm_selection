@@ -31,13 +31,18 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.rho = 0.9 # AR(1) shock
         par.sigma_z = 0.03 # std. dev. of shock
         par.omega_sigma = 0.5
-        par.psi = 0.05 # convex adjustment cost
-        par.xi = 0.0001 # fixed adjustment cost
-        par.cf = 0.1 # fixed cost
-        par.nu = 100 # leverage ratio
-        par.recovery = 0.2 # 54
 
+        # Adjustment costs on capital
+        par.psi = 0.05 # convex adjustment cost
+        par.xi = 0.06 # fixed adjustment cost
+        par.cf = 0.1 # fixed cost
+        par.nu = 0.9 # leverage ratio
+        par.recovery = 0.54 # recovery rate
+
+        par.pi_d = 0.01
+        par.beta = par.beta * (1-par.pi_d)
         par.r = (1/par.beta - 1) * 1.02
+
 
         # Steady state
         par.z_bar = 1
@@ -117,6 +122,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans.k_policy = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
         trans.V = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
         trans.D = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
+        trans.D_hat = np.zeros((par.T, par.Nz, par.Nb, par.Nk))
 
     def prepare(self): # required
         """ precompute specific arrays before ssving the model"""

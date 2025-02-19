@@ -107,7 +107,6 @@ Solve adjuster problem
 @njit 
 def bellman_adj(k_next, b, k, iz, q_mat, b_keep, W, par):
     z = par.z_grid[iz]
-
     y = z * k**par.alpha 
     y_new = z * (k_next / (1-par.delta))**par.alpha
 
@@ -134,7 +133,6 @@ def bellman_adj(k_next, b, k, iz, q_mat, b_keep, W, par):
 def bellman_invest(k_next, b_next, b, k, iz, q_mat, W, par): 
 
     z = par.z_grid[iz]
-
     coh = z * k**par.alpha + (1-par.delta) * k - b 
     q = interp_2d(par.b_grid, par.k_grid, q_mat[iz], b_next, k_next)
     adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) # psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
