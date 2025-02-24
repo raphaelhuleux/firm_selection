@@ -34,7 +34,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
 
         # Adjustment costs on capital
         par.psi = 0.05 # convex adjustment cost
-        par.xi = 0.06 # fixed adjustment cost
+        par.xi = 0.01 # fixed adjustment cost
         par.cf = 0.1 # fixed cost
         par.nu = 0.9 # leverage ratio
         par.recovery = 0.54 # recovery rate

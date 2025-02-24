@@ -20,10 +20,10 @@ TODO model
 """
 
 # NVFI - analytical
-model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'optimizer', 'howard': True, 'iter_howard':50})   
+model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'analytical', 'howard': True, 'iter_howard':50})   
 model.prepare()
 model.solve_steady_state()
-#model.solve_transition()
+model.solve_transition()
 
 with jit(model) as model:
     par = model.par
