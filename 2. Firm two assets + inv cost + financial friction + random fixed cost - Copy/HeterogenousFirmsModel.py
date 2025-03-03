@@ -6,10 +6,9 @@ from model_functions import *
 from precompute import compute_exit_decision_ss, compute_exit_decision_trans, compute_b_min, compute_k_max, compute_exit_decision_adj
 from vfi_grid_search import solve_vfi_grid_search
 from nvfi import solve_nvfi_ss, solve_problem_firm_trans
-from consav.quadrature import log_normal_gauss_hermite
+from consav.quadrature import log_normal_gauss_hermite, normal_gauss_hermite
 from consav.grids import nonlinspace # grids
 from compute_distribution import distribution_ss, distribution_trans
-from scipy.stats import norm
 
 class HeterogenousFirmsModelClass(EconModelClass):
     
@@ -31,7 +30,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
 
         par.rho = 0.9 # AR(1) shock
         par.sigma_z = 0.03 # std. dev. of shock
-        par.omega_sigma = 0.5
+        par.omega_sigma = 0.5 # fixed cost shock
 
         # Adjustment costs on capital
         par.psi = 0.05 # convex adjustment cost
@@ -45,24 +44,8 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.r = (1/par.beta - 1) * 1.02
 
         # Capital quality shock
-        par.sigma_k = 0.04 
-        par.ks_min = -4 * par.sigma_k 
-        par.ks_max = 0 * par.sigma_k
-        par.Nkshock = 10
-        par.k_shock_grid = np.linspace(par.ks_min, par.ks_max, par.Nkshock)
-        vPlus = np.zeros(par.Nkshock)
-        vPlus[-1] = 1e9
-        vPlus[:-1] = par.k_shock_grid[1:]
-
-        vMinus = np.zeros(par.Nkshock)
-        vMinus[0] = -1e9
-        vMinus[1:] = par.k_shock_grid[:-1]
-
-        vPlusCutoff = 0.5 * (par.k_shock_grid + vPlus)
-        vMinusCutoff = 0.5 * (par.k_shock_grid + vMinus)
-
-        par.k_shock_p = norm.cdf(vPlusCutoff, 0, par.sigma_k) - norm.cdf(vMinusCutoff, 0, par.sigma_k)
-        par.k_shock_grid = np.exp(par.k_shock_grid)
+        par.sigma_k = 0.04  
+        k_shock = normal_gauss_hermite(par.sigma_k, mu = 0, n=6)
 
         # Steady state
         par.z_bar = 1
@@ -76,16 +59,16 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans.r = par.r + par.sigma_r * par.rho_r **(np.arange(par.T))
 
         # Grid
-        par.Nk = 100
+        par.Nk = 80
         par.Nb = 70
         par.Nz = 6
-        par.Nomega = 1
+        par.Nomega = 7
 
         par.Nk_choice = 100
         par.Nb_choice = 100
 
         par.k_min = 0.0
-        par.k_max = 3*par.kbar
+        par.k_max = 4*par.kbar
 
         par.b_min = 0
         par.b_max = par.k_max /2
@@ -113,20 +96,8 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.b_grid = np.linspace(par.b_min,par.b_max,par.Nb)
 
         shock = qe.rouwenhorst(par.Nz, par.rho, par.sigma_z)
-        P = shock.P
+        par.P = shock.P
         par.z_grid = par.z_bar * np.exp(shock.state_values)
-
-        par.share_low = 0.5 
-        par.share_high = 0.5 
-
-        par.z_grid_low = 0.9 * par.z_grid 
-        par.z_grid_high = 1.1 * par.z_grid
-
-        par.z_grid = np.concatenate((par.z_grid_low, par.z_grid_high))
-        par.P = np.zeros((2*par.Nz, 2*par.Nz))
-        par.P[:par.Nz, :par.Nz] = P 
-        par.P[par.Nz:, par.Nz:] = P
-        par.Nz = 2*par.Nz
         
         par.omega_grid, par.omega_p = log_normal_gauss_hermite(par.omega_sigma, n=par.Nomega,mu=par.cf)
                 

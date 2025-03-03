@@ -208,8 +208,6 @@ def nvfi_step(V, q_mat, exit_policy, exit_policy_adj, b_min_keep, k_max_adj, par
     #W = par.beta * fast_expectation(par.P, V)
     W = par.beta * multiply_ith_dimension(par.P, 0, V)
     W = compute_expectation_omega(W, par)
-    W = compute_expectation_k_shock(W, par)
-    
     if solve_b == 'analytical':
         V_keep, k_keep, b_keep = solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par)
     else:
@@ -222,7 +220,7 @@ def nvfi_step(V, q_mat, exit_policy, exit_policy_adj, b_min_keep, k_max_adj, par
 
     return V_new, k_policy, b_policy
 
-def solve_nvfi_ss(ss, par, tol = 1e-3):
+def solve_nvfi_ss(ss, par, tol = 1e-4):
     error = 1
 
     V_init = np.zeros((par.Nz, par.Nb, par.Nk))
@@ -277,7 +275,6 @@ def howard_nvfi(V, k_policy, b_policy, ss,  par):
         W = par.beta * multiply_ith_dimension(par.P, 0, V)
         #W = par.beta * fast_expectation(par.P, V)
         W = compute_expectation_omega(W, par)
-        W = compute_expectation_k_shock(W, par)
         V = howard_step_nvfi(W, k_policy, b_policy, ss, par)
 
     return V 
