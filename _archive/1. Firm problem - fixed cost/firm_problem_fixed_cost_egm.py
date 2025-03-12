@@ -282,4 +282,6 @@ div = z_grid[:, np.newaxis] * k_grid**alpha - k_policy_vfi + (1-delta) * k_grid 
 
 plt.plot(k_grid, V_vfi.T)
 plt.plot(k_grid, V_egm.T, linestyle = ':')
+plt.show()
 plt.plot(k_grid, Vexit.T, color = 'black')
+plt.show()
