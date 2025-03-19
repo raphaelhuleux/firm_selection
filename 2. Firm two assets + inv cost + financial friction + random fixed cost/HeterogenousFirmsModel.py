@@ -48,7 +48,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.sigma_k = 0.04 
         par.ks_min = -4 * par.sigma_k 
         par.ks_max = 0 * par.sigma_k
-        par.Nkshock = 10
+        par.Nkshock = 6
         par.k_shock_grid = np.linspace(par.ks_min, par.ks_max, par.Nkshock)
         vPlus = np.zeros(par.Nkshock)
         vPlus[-1] = 1e9
@@ -76,10 +76,10 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans.r = par.r + par.sigma_r * par.rho_r **(np.arange(par.T))
 
         # Grid
-        par.Nk = 100
-        par.Nb = 70
+        par.Nk = 90
+        par.Nb = 60
         par.Nz = 6
-        par.Nomega = 1
+        par.Nomega = 3
 
         par.Nk_choice = 100
         par.Nb_choice = 100
