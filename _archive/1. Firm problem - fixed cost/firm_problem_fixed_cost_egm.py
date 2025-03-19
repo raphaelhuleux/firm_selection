@@ -12,15 +12,15 @@ from scipy import optimize
 
 # Parameters
 
-alpha = 1/2 # capital share
-beta = 0.95 # discount factor
-delta = 0.1
+alpha = 0.21 # capital share
+beta = 0.99 # discount factor
+delta = 0.025
 
-rho = 0.8
-sigma_z = 0.2
+rho = 0.9
+sigma_z = 0.03
 psi = 0.05
-xi = 0.01
-cf = 1.1
+xi = 0#0.01
+cf = 0.1
 
 # Steady state
 z_bar = 0.9
@@ -37,7 +37,7 @@ z_grid = z_bar * np.exp(shock.state_values)
 
 def dividend(k_next, k, z):
     adj_cost = psi / 2 * (k_next - (1-delta)*k)**2 / k + xi * k 
-    div = z * k**alpha - adj_cost - k_next + (1-delta) * k
+    div = z * k**alpha - adj_cost - k_next + (1-delta) * k - cf
     return div
 
 kmax_vec = np.zeros((N_z, N_k))
@@ -191,11 +191,11 @@ def upperenv_vec(W, k_endo, z_grid, k_grid, alpha, psi, xi, delta):
                 div = z_grid[iz] * k_grid[ik]**alpha - k[iz,ik] + (1-delta) * k_grid[ik] - adj_cost
                 V[iz, ik] = div + interp_1d(k_grid, W[iz,:], k[iz, ik])
 
-            if k[iz,ik] > kmax_vec[iz,ik]:
-                k[iz,ik] = kmax_vec[iz,ik]
-                adj_cost = psi / 2 * ((k[iz,ik] - (1-delta)*k_grid[ik])  / k_grid[ik])**2 * k_grid[ik] + xi * k_grid[ik] 
-                div = z_grid[iz] * k_grid[ik]**alpha - k[iz,ik] + (1-delta) * k_grid[ik] - adj_cost
-                V[iz,ik] = div + interp_1d(k_grid, W[iz,:], k[iz,ik])
+            #if k[iz,ik] > kmax_vec[iz,ik]:
+            #    k[iz,ik] = kmax_vec[iz,ik]
+            #    adj_cost = psi / 2 * ((k[iz,ik] - (1-delta)*k_grid[ik])  / k_grid[ik])**2 * k_grid[ik] + xi * k_grid[ik] 
+            #    div = z_grid[iz] * k_grid[ik]**alpha - k[iz,ik] + (1-delta) * k_grid[ik] - adj_cost
+            #    V[iz,ik] = div + interp_1d(k_grid, W[iz,:], k[iz,ik])
 
     return V, k
 
@@ -250,8 +250,7 @@ def egm(V, Va, Vexit, k_grid, z_grid, alpha, psi, xi, delta, beta, cf, P):
 Code
 """
 
-Vexit = z_grid[:,np.newaxis] * k_grid[np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,:] - (psi/2)* (delta-1)**2 * k_grid[np.newaxis,:] - xi*k_grid[np.newaxis,:]  
-
+Vexit = -np.inf * np.ones((N_z,N_k)) #z_grid[:,np.newaxis] * k_grid[np.newaxis,:]**alpha + (1-delta) * k_grid[np.newaxis,:] - (psi/2)* (delta-1)**2 * k_grid[np.newaxis,:] - xi*k_grid[np.newaxis,:]  
 
 k_init = k_grid**(1/2)
 V_init = (z_grid[:, np.newaxis] * k_init**alpha) * 1/(1-beta)
@@ -260,13 +259,12 @@ Va_init[..., 1:-1] = (V_init[..., 2:] - V_init[..., :-2]) / (k_grid[2:] - k_grid
 Va_init[..., 0] = (V_init[..., 1] - V_init[..., 0]) / (k_grid[1] - k_grid[0])
 Va_init[..., -1] = (V_init[..., -1] - V_init[..., -2]) / (k_grid[-1] - k_grid[-2])
 
-
-V_vfi, k_policy_vfi = vfi(V_init, Vexit, psi, xi, delta, alpha, cf, z_grid, k_grid)
-
-Va_vfi = np.empty_like(V_init)
-Va_vfi[..., 1:-1] = (V_vfi[..., 2:] - V_vfi[..., :-2]) / (k_grid[2:] - k_grid[:-2])
-Va_vfi[..., 0] = (V_vfi[..., 1] - V_vfi[..., 0]) / (k_grid[1] - k_grid[0])
-Va_vfi[..., -1] = (V_vfi[..., -1] - V_vfi[..., -2]) / (k_grid[-1] - k_grid[-2])
+#V_vfi, k_policy_vfi = vfi(V_init, Vexit, psi, xi, delta, alpha, cf, z_grid, k_grid)
+#
+#Va_vfi = np.empty_like(V_init)
+#Va_vfi[..., 1:-1] = (V_vfi[..., 2:] - V_vfi[..., :-2]) / (k_grid[2:] - k_grid[:-2])
+#Va_vfi[..., 0] = (V_vfi[..., 1] - V_vfi[..., 0]) / (k_grid[1] - k_grid[0])
+#Va_vfi[..., -1] = (V_vfi[..., -1] - V_vfi[..., -2]) / (k_grid[-1] - k_grid[-2])
 
 V_egm, Va_egm, k_policy_egm = egm(V_init, Va_init, Vexit, k_grid, z_grid, alpha, psi, xi, delta, beta, cf, P)
 
@@ -279,7 +277,100 @@ plt.plot(k_grid, Va_vfi.T, linestyle = ':')
 plt.show()
 div = z_grid[:, np.newaxis] * k_grid**alpha - k_policy_vfi + (1-delta) * k_grid - psi / 2 * ((k_policy_vfi - (1-delta)*k_grid)  / k_grid)**2 * k_grid - xi * k_grid        
 
-
 plt.plot(k_grid, V_vfi.T)
 plt.plot(k_grid, V_egm.T, linestyle = ':')
-plt.plot(k_grid, Vexit.T, color = 'black')
+#plt.plot(k_grid, Vexit.T, color = 'black')
+
+def obtain_minimum_savings_policy(k_policy, b_policy, k_grid, z_grid, alpha, delta, psi, xi):
+    b_policy = np.zeros((N_z, N_k))
+    b_policy_new = np.zeros((N_z, N_k, N_z))
+
+    tol = 1e-4
+    error = 1 
+
+    while error > tol:
+        b_policy_new = obtain_minimum_savings_policy_step(k_policy, b_policy, k_grid, z_grid, alpha, delta, psi, xi)
+        b_policy_new = np.min(b_policy_new, axis = 2)
+        error = np.max(np.abs(b_policy_new - b_policy))
+        print(error)
+        b_policy = b_policy_new.copy()
+        b_policy_new = np.zeros((N_z, N_k, N_z))
+
+    return b_policy
+
+@nb.njit
+def obtain_minimum_savings_policy_step(k_policy, b_policy, k_grid, z_grid, alpha, delta, psi, xi):
+    b_policy_new = np.zeros((N_z, N_k, N_z))
+    for iz in range(N_z):
+        for ik in range(N_k):
+            for iz_next in range(N_z):
+                z_next = z_grid[iz_next]
+                k_next = k_policy_egm[iz, ik]
+                b_next = b_policy[iz, ik]
+
+                k_next2 = interp_1d(k_grid, k_policy[iz_next,:], k_next)
+                b_next2 = interp_1d(k_grid, b_policy[iz_next,:], k_next)
+
+                if (1-delta) * k_next < k_next2:
+                    adj_cost = psi / 2 * ((k_next2 - (1-delta)*k_next)  / k_next)**2 * k_next + xi * k_next
+                else:
+                    adj_cost = 0
+                y = z_next * k_next**alpha 
+
+                b_policy_new[iz,ik,iz_next] = y + (1-delta) * k_next + np.minimum(- k_next2 - adj_cost + beta * b_next2, 0)  - cf
+                #b_policy_new[iz,ik,iz_next] = y + (1-delta) * k_next - k_next2 - adj_cost + beta * b_next2 - cf
+
+    return b_policy_new
+
+b_policy = obtain_minimum_savings_policy(k_policy_egm, b_policy, k_grid, z_grid, alpha, delta, psi, xi)
+
+plt.plot(k_grid, b_policy.T)
+plt.plot(k_grid, k_policy_egm.T, linestyle = ':')
+
+N_b = 100
+b_grid = np.linspace(0, 40, N_b)
+y = z_grid[:,None,None] * k_grid[None,:,None]**alpha
+adj_cost = psi / 2 * ((k_policy_egm[:,:,None] - (1-delta)*k_grid[None,:,None])  / k_grid[None,:,None])**2 * k_grid[None,:,None] + xi * k_grid[None,:,None]
+
+n = y + (1-delta) * k_grid[None,:,None] - b_grid[None,None,:]
+div = y - k_policy_egm[:,:,None] + (1-delta) * k_grid[None,:,None] - adj_cost - b_grid[None,None,:] + beta * b_policy[:,:,None] - cf
+
+np.min(div)
+
+unconstrained_indicator = np.zeros((N_z, N_k, N_b))
+for iz in range(N_z):
+    z = z_grid[iz]
+    for ik in range(N_k):
+        k = k_grid[ik]
+        for ib in range(N_b):
+            b = b_grid[ib]
+            y = z * k**alpha
+            n = y + (1-delta) * k - b 
+
+            k_next = k_policy_egm[iz,ik]
+            b_next = b_policy[iz,ik]
+            adj_cost = psi / 2 * ((k_next - (1-delta)*k)  / k)**2 * k + xi * k
+            div = y - k_next + (1-delta) * k - adj_cost - b + beta * b_next - cf
+
+            if div < 0:
+                unconstrained_indicator[iz,ik,ib] = 0
+            else:
+                unconstrained_indicator[iz,ik,ib] = 1
+
+adj_cost = psi / 2 * ((k_policy_egm - (1-delta)*k_grid[None,:])  / k_grid[None,:])**2 * k_grid[None,:] + xi * k_grid[None,:]
+np.max(k_policy_egm + adj_cost - beta * b_policy)
+adj_i = k_policy_egm[:,:,None] - (1-delta) * k_grid[None,:,None] > 0
+
+unconstrained_keep = (1-adj_i) * unconstrained_indicator
+ii = np.argwhere(unconstrained_keep == 1)
+iz, ik, ib = ii[0]
+
+b = b_grid[ib]
+k = k_grid[ik]
+div[iz,ik,ib]
+b_policy[iz,ik]
+""" 
+1. Check default decision
+2. Check unconstrained threshold
+3. Compute constrained policy
+"""

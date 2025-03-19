@@ -104,30 +104,8 @@ def solve_keep(W, exit_policy, q_mat, par):
 Solve adjuster problem
 """
 
-
-"""  
-@njit 
-def bellman_adj_2(x, b, k, z, iz, q_mat, W, par):
-    k_next, leverage = x 
-
-    b_next = k_next * leverage 
-    y = z * k**par.alpha
-    q = interp_2d(par.b_grid, par.k_grid, q_mat[iz], b_next, k_next)
-    coh = y - b + b_next * q
-    adj_cost = compute_adjustment_cost(k_next, k, par.delta, par.psi, par.xi) 
-    div = coh - adj_cost - k_next 
-
-    penalty = 0.0
-    if div < 0:
-        penalty += np.abs(div)*1e3
-
-    V = div + interp_2d(par.b_grid, par.k_grid, W[iz], b_next, k_next)
-    return V - penalty
-"""  
-
 @njit 
 def bellman_adj(k_next, b, k, iz, q_mat, b_keep, W, par):
-
     z = par.z_grid[iz]
     y = z * k**par.alpha 
     y_new = z * (k_next / (1-par.delta))**par.alpha
@@ -230,6 +208,8 @@ def nvfi_step(V, q_mat, exit_policy, exit_policy_adj, b_min_keep, k_max_adj, par
     #W = par.beta * fast_expectation(par.P, V)
     W = par.beta * multiply_ith_dimension(par.P, 0, V)
     W = compute_expectation_omega(W, par)
+    W = compute_expectation_k_shock(W, par)
+    
     if solve_b == 'analytical':
         V_keep, k_keep, b_keep = solve_keep_analytical(W, exit_policy, q_mat, b_min_keep, par)
     else:
@@ -242,7 +222,7 @@ def nvfi_step(V, q_mat, exit_policy, exit_policy_adj, b_min_keep, k_max_adj, par
 
     return V_new, k_policy, b_policy
 
-def solve_nvfi_ss(ss, par, tol = 1e-4):
+def solve_nvfi_ss(ss, par, tol = 1e-3):
     error = 1
 
     V_init = np.zeros((par.Nz, par.Nb, par.Nk))
@@ -297,6 +277,7 @@ def howard_nvfi(V, k_policy, b_policy, ss,  par):
         W = par.beta * multiply_ith_dimension(par.P, 0, V)
         #W = par.beta * fast_expectation(par.P, V)
         W = compute_expectation_omega(W, par)
+        W = compute_expectation_k_shock(W, par)
         V = howard_step_nvfi(W, k_policy, b_policy, ss, par)
 
     return V 

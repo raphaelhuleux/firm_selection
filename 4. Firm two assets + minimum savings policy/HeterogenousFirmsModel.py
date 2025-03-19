@@ -1,14 +1,13 @@
 from EconModel import EconModelClass, jit
 import numpy as np
-import numba as nb
 import quantecon as qe
 from model_functions import * 
-from precompute import compute_exit_decision_ss, compute_exit_decision_trans, compute_b_min, compute_k_max, compute_exit_decision_adj
-from vfi_grid_search import solve_vfi_grid_search
-from nvfi import solve_nvfi_ss, solve_problem_firm_trans
-from consav.quadrature import log_normal_gauss_hermite, normal_gauss_hermite
-from consav.grids import nonlinspace # grids
+from precompute import compute_exit_decision_ss, compute_exit_decision_trans, compute_k_max
+from consav.quadrature import log_normal_gauss_hermite
 from compute_distribution import distribution_ss, distribution_trans
+from scipy.stats import norm
+from egm_unconstrained import egm_unconstrained_ss, obtain_minimum_savings_policy, get_unconstrained_indicator
+from vfi import solve_vfi_ss
 
 class HeterogenousFirmsModelClass(EconModelClass):
     
@@ -30,7 +29,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
 
         par.rho = 0.9 # AR(1) shock
         par.sigma_z = 0.03 # std. dev. of shock
-        par.omega_sigma = 0.5 # fixed cost shock
+        par.omega_sigma = 0.5
 
         # Adjustment costs on capital
         par.psi = 0.05 # convex adjustment cost
@@ -44,8 +43,24 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.r = (1/par.beta - 1) * 1.02
 
         # Capital quality shock
-        par.sigma_k = 0.04  
-        k_shock = normal_gauss_hermite(par.sigma_k, mu = 0, n=6)
+        par.sigma_k = 0.04 
+        par.ks_min = -4 * par.sigma_k 
+        par.ks_max = 0 * par.sigma_k
+        par.Nkshock = 10
+        par.k_shock_grid = np.linspace(par.ks_min, par.ks_max, par.Nkshock)
+        vPlus = np.zeros(par.Nkshock)
+        vPlus[-1] = 1e9
+        vPlus[:-1] = par.k_shock_grid[1:]
+
+        vMinus = np.zeros(par.Nkshock)
+        vMinus[0] = -1e9
+        vMinus[1:] = par.k_shock_grid[:-1]
+
+        vPlusCutoff = 0.5 * (par.k_shock_grid + vPlus)
+        vMinusCutoff = 0.5 * (par.k_shock_grid + vMinus)
+
+        par.k_shock_p = norm.cdf(vPlusCutoff, 0, par.sigma_k) - norm.cdf(vMinusCutoff, 0, par.sigma_k)
+        par.k_shock_grid = np.exp(par.k_shock_grid)
 
         # Steady state
         par.z_bar = 1
@@ -59,16 +74,16 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans.r = par.r + par.sigma_r * par.rho_r **(np.arange(par.T))
 
         # Grid
-        par.Nk = 80
+        par.Nk = 100
         par.Nb = 70
         par.Nz = 6
-        par.Nomega = 7
+        par.Nomega = 3
 
         par.Nk_choice = 100
         par.Nb_choice = 100
 
-        par.k_min = 0.0
-        par.k_max = 4*par.kbar
+        par.k_min = 0 #0.1*par.kbar
+        par.k_max = 3*par.kbar
 
         par.b_min = 0
         par.b_max = par.k_max /2
@@ -96,8 +111,20 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.b_grid = np.linspace(par.b_min,par.b_max,par.Nb)
 
         shock = qe.rouwenhorst(par.Nz, par.rho, par.sigma_z)
-        par.P = shock.P
+        P = shock.P
         par.z_grid = par.z_bar * np.exp(shock.state_values)
+
+        par.share_low = 0.5 
+        par.share_high = 0.5 
+
+        par.z_grid_low = 0.9 * par.z_grid 
+        par.z_grid_high = 1.1 * par.z_grid
+
+        par.z_grid = np.concatenate((par.z_grid_low, par.z_grid_high))
+        par.P = np.zeros((2*par.Nz, 2*par.Nz))
+        par.P[:par.Nz, :par.Nz] = P 
+        par.P[par.Nz:, par.Nz:] = P
+        par.Nz = 2*par.Nz
         
         par.omega_grid, par.omega_p = log_normal_gauss_hermite(par.omega_sigma, n=par.Nomega,mu=par.cf)
                 
@@ -114,6 +141,12 @@ class HeterogenousFirmsModelClass(EconModelClass):
 
         ss.b_policy = np.zeros((par.Nz, par.Nb, par.Nk))
         ss.k_policy = np.zeros((par.Nz, par.Nb, par.Nk))
+
+        ss.b_policy_unconstrained = np.zeros((par.Nz, par.Nk))
+        ss.k_policy_unconstrained = np.zeros((par.Nz, par.Nk))
+        ss.unconstrained_indicator = np.zeros((par.Nz, par.Nb, par.Nk))
+        ss.div_unconstrained = np.zeros((par.Nz, par.Nb, par.Nk))
+
         ss.V = np.zeros((par.Nz, par.Nb, par.Nk))
         ss.D = np.zeros((par.Nz, par.Nb, par.Nk))
 
@@ -133,9 +166,11 @@ class HeterogenousFirmsModelClass(EconModelClass):
             par = model.par
             ss = model.ss
 
-            ss.exit_policy[...], ss.exit_policy_adj[...], ss.q[...] = compute_exit_decision_ss(ss.r, par)
-            ss.b_min_keep[...] = compute_b_min(ss.q, ss.exit_policy, par)
-            ss.k_max_adj[...] = compute_k_max(ss.q, ss.exit_policy, par)
+            ss.exit_policy[...], ss.q[...] = compute_exit_decision_ss(ss.r, par)
+            ss.k_max_adj[...], ss.exit_policy_adj[...] = compute_k_max(ss.q, ss.exit_policy, par)
+            ss.k_policy_unconstrained[...] = egm_unconstrained_ss(ss, par)
+            ss.b_policy_unconstrained[...] = obtain_minimum_savings_policy(ss.k_policy_unconstrained, par)
+            ss.unconstrained_indicator[...], ss.div_unconstrained[...] = get_unconstrained_indicator(ss.k_policy_unconstrained, ss.b_policy_unconstrained, par)
 
     def solve_steady_state(self):
         
@@ -143,11 +178,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
             par = model.par
             ss = model.ss
 
-            if model.par.solve == 'grid_search':
-                solve_vfi_grid_search(par, ss)
-            elif model.par.solve == 'nvfi':
-                solve_nvfi_ss(ss, par)
-
+            solve_vfi_ss(par, ss)
             distribution_ss(ss, par)
 
     def solve_transition(self):
@@ -156,7 +187,7 @@ class HeterogenousFirmsModelClass(EconModelClass):
             ss = model.ss
             trans = model.trans
 
-            trans.exit_policy[...], trans.exit_policy_adj[...], trans.q[...] = compute_exit_decision_trans(trans.r, ss, par)
-            solve_problem_firm_trans(trans, ss, par)
-            distribution_trans(trans, ss, par)
+            #trans.exit_policy[...], trans.exit_policy_adj[...], trans.q[...] = compute_exit_decision_trans(trans.r, ss, par)
+            #solve_problem_firm_trans(trans, ss, par)
+            #distribution_trans(trans, ss, par)
             

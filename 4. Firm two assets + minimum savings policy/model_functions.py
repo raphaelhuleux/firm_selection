@@ -69,18 +69,34 @@ def compute_expectation_omega(V, par):
 
     return W
 
+@njit(parallel = True)
+def compute_expectation_k_shock(V, par):
+
+    W = np.zeros((par.Nz, par.Nb, par.Nk))
+
+    for iz in prange(par.Nz):
+        for ik in range(par.Nk):
+            for ib in range(par.Nb):
+                temp = np.zeros_like(par.k_shock_grid)
+                interp_1d_vec(par.k_grid, V[iz,ib,:], par.k_grid[ik] * par.k_shock_grid, temp)
+                W[iz,ib,ik] = np.sum(par.k_shock_p * temp)
+
+    return W    
+
 @njit
 def debt_price_function(iz, k_next, b_next, r, exit_policy, par):
     q = 0.0
 
     for iz_prime in range(par.Nz):
         for i_omega in range(par.Nomega): 
-            b_next_tilde = b_next + par.omega_grid[i_omega]
-            n = np.minimum((par.recovery * (1-par.delta) * k_next) / np.maximum(b_next, 1e-4), 1)
-            Pz = par.P[iz,iz_prime] * par.omega_p[i_omega]
-            prob_default = np.minimum(interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next), 1) + par.pi_d
-            q_temp = 1/(1+r) * ((1-prob_default) + prob_default * n) 
-            q += Pz * q_temp    
+            for i_k_shock in range(par.Nkshock):
+                k_next_tilde = k_next * par.k_shock_grid[i_k_shock]
+                b_next_tilde = b_next + par.omega_grid[i_omega]
+                n = np.minimum((par.recovery * (1-par.delta) * k_next_tilde) / np.maximum(b_next, 1e-4), 1)
+                Pz = par.P[iz,iz_prime] * par.omega_p[i_omega] * par.k_shock_p[i_k_shock]
+                prob_default = np.minimum(interp_2d(par.b_grid, par.k_grid, exit_policy[iz_prime,:,:], b_next_tilde, k_next_tilde), 1) + par.pi_d
+                q_temp = 1/(1+r) * ((1-prob_default) + prob_default * n) 
+                q += Pz * q_temp    
 
     return q 
 

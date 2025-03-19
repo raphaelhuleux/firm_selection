@@ -4,9 +4,18 @@ from EconModel import jit
 from HeterogenousFirmsModel import HeterogenousFirmsModelClass
 
 """ 
+Cleansing vs firm selection
+- Cleansing: firms exit during monetary policy shocks
+    - would be interesting to compare mon pol to TFP shocks
+    - maybe mon pol shock affect firms with high leverage more than TFP shocks
+    - what is the role of real frictions? harder to smooth in case of shocks
+- Firm selection: who exits in the absence of shocks
+
 TODO data
 - get French data 
 - 
+
+TODO code 
 
 TODO model
 - Change reversibility of capital
@@ -20,7 +29,7 @@ TODO model
 """
 
 # NVFI - analytical
-model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'optimizer', 'howard': True, 'iter_howard':50})   
+model = HeterogenousFirmsModelClass(name='HeterogenousFirmsModel', par = {'solve_b': 'analytical', 'howard': True, 'iter_howard':50})   
 model.prepare()
 model.solve_steady_state()
 model.solve_transition()
@@ -79,10 +88,10 @@ plt.ylabel('B')
 plt.xlabel('t')
 plt.show()
 
-plt.plot(par.b_grid, np.sum(ss.D[:int(par.Nz/2)], axis = (0,2)) / 0.5, label = 'b low')
-plt.plot(par.b_grid, np.sum(ss.D[int(par.Nz/2):-1], axis = (0,2)) / 0.5, label = 'b high', linestyle = ':')
-plt.plot(par.k_grid, np.sum(ss.D[:int(par.Nz/2)], axis = (0,1)) / 0.5,  label = 'k low')
-plt.plot(par.k_grid, np.sum(ss.D[int(par.Nz/2):-1], axis = (0,1)) / 0.5, label = 'k high', linestyle = ':')
+plt.plot(par.b_grid, np.sum(ss.D, axis = (0,2)), label = 'b')
+plt.plot(par.k_grid, np.sum(ss.D, axis = (0,1)), label = 'k')
+plt.plot(par.b_grid, np.sum(trans.D[-1], axis = (0,2)), linestyle = ':')
+plt.plot(par.k_grid, np.sum(trans.D[-1], axis = (0,1)), linestyle = ':')
 plt.xlabel('k, b')
 plt.ylabel('Density')
 plt.legend()
@@ -101,12 +110,14 @@ plt.colorbar()
 # Set the actual b_grid and k_grid values as labels
 plt.xticks(ticks=np.linspace(b_grid.min(), b_grid.max(), len(b_grid)), labels=np.round(b_grid, 2))
 plt.yticks(ticks=np.linspace(k_grid.min(), k_grid.max(), len(k_grid)), labels=np.round(k_grid, 2))
+
 plt.xlabel('b_grid')
 plt.ylabel('k_grid')
+
 plt.show()
 
 for iz in range(par.Nz):
-    plt.plot(par.b_grid, np.sum(ss.D[iz], axis = (1)) / np.sum(ss.D[iz]), label = 'z = ' + str(par.z_grid[iz]))
+    plt.plot(par.b_grid[:10], np.sum(ss.D[iz], axis = (1))[:10] / np.sum(ss.D[iz]), label = 'z = ' + str(par.z_grid[iz]))
 plt.xlabel('b')
 plt.ylabel('Density')
 plt.legend()
@@ -116,33 +127,7 @@ for iz in range(par.Nz):
     print('z = ', par.z_grid[iz])
     print('b = ', np.sum(ss.D[iz] * par.b_grid[:,None]) / np.sum(ss.D[iz]))
     print('k = ', np.sum(ss.D[iz] * par.k_grid[None,:]) / np.sum(ss.D[iz]))
-    print('prob default = ', np.sum(ss.exit_policy[iz] * ss.D[iz]) / np.sum(ss.D[iz])*100)
-    print(' ')
-
-t = 10
-for iz in range(par.Nz):
-    print('z = ', par.z_grid[iz])
-    print('b = ', np.sum(trans.D[:t,iz] * par.b_grid[None,:,None]) / np.sum(trans.D[:t,iz]))
-    print('k = ', np.sum(trans.D[:t,iz] * par.k_grid[None,None,:]) / np.sum(trans.D[:t,iz]))
-    print('prob default = ', np.sum(trans.exit_policy[:t,iz] * trans.D[:t,iz]) / np.sum(trans.D[:t,iz])*100)
-    print(' ')
-
-
-for iz in range(2):
-    i_low = int(iz*par.Nz/2)
-    i_high = int((iz+1)*par.Nz/2)
-    print('b = ', np.sum(ss.D[i_low:i_high] * par.b_grid[:,None]) / np.sum(ss.D[i_low:i_high]))
-    print('k = ', np.sum(ss.D[i_low:i_high] * par.k_grid[None,:]) / np.sum(ss.D[i_low:i_high]))
-    print('prob default = ', np.sum(ss.exit_policy[i_low:i_high] * ss.D[i_low:i_high]) / np.sum(ss.D[i_low:i_high])*100)
-    print(' ')
-
-t = 10
-for iz in range(2):
-    i_low = int(iz*par.Nz/2)
-    i_high = int((iz+1)*par.Nz/2)
-    print('b = ', np.sum(trans.D[:t,i_low:i_high] * par.b_grid[:,None]) / np.sum(trans.D[:t,i_low:i_high]))
-    print('k = ', np.sum(trans.D[:t,i_low:i_high] * par.k_grid[None,:]) / np.sum(trans.D[:t,i_low:i_high]))
-    print('prob default = ', np.sum(trans.exit_policy[:t,i_low:i_high] * trans.D[:t,i_low:i_high]) / np.sum(trans.D[:t,i_low:i_high])*100)
+    print('prob default = ', np.sum(ss.exit_policy[iz] * ss.D[iz]) / np.sum(ss.D[iz]))
     print(' ')
 
 """ 
