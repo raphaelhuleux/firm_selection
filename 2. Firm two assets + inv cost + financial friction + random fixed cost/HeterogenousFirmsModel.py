@@ -44,8 +44,24 @@ class HeterogenousFirmsModelClass(EconModelClass):
         par.r = (1/par.beta - 1) * 1.02
 
         # Capital quality shock
-        par.sigma_k = 0.04  
-        k_shock = normal_gauss_hermite(par.sigma_k, mu = 0, n=6)
+        par.sigma_k = 0.04 
+        par.ks_min = -4 * par.sigma_k 
+        par.ks_max = 0 * par.sigma_k
+        par.Nkshock = 6
+        par.k_shock_grid = np.linspace(par.ks_min, par.ks_max, par.Nkshock)
+        vPlus = np.zeros(par.Nkshock)
+        vPlus[-1] = 1e9
+        vPlus[:-1] = par.k_shock_grid[1:]
+
+        vMinus = np.zeros(par.Nkshock)
+        vMinus[0] = -1e9
+        vMinus[1:] = par.k_shock_grid[:-1]
+
+        vPlusCutoff = 0.5 * (par.k_shock_grid + vPlus)
+        vMinusCutoff = 0.5 * (par.k_shock_grid + vMinus)
+
+        par.k_shock_p = norm.cdf(vPlusCutoff, 0, par.sigma_k) - norm.cdf(vMinusCutoff, 0, par.sigma_k)
+        par.k_shock_grid = np.exp(par.k_shock_grid)
 
         # Steady state
         par.z_bar = 1
@@ -59,9 +75,12 @@ class HeterogenousFirmsModelClass(EconModelClass):
         trans.r = par.r + par.sigma_r * par.rho_r **(np.arange(par.T))
 
         # Grid
+        par.Nk = 90
+        par.Nb = 60
         par.Nk = 80
         par.Nb = 70
         par.Nz = 6
+        par.Nomega = 3
         par.Nomega = 7
 
         par.Nk_choice = 100
